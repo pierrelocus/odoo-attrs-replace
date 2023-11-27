@@ -58,8 +58,8 @@ def get_new_attrs(attrs):
 
 autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file)')
 
+nofilesfound = True
 for xml_file in all_xml_files:
-    print('Taking Care of XML File : %s' % xml_file)
     with open(xml_file, 'rb') as f:
         contents = f.read().decode('utf-8')
         f.close()
@@ -69,6 +69,8 @@ for xml_file in all_xml_files:
         tags = soup.select('[attrs]')
         if not tags:
             continue
+        nofilesfound = False
+        print('Taking Care of XML File : %s' % xml_file)
         print(tags)
         print('Will be replaced by')
         for tag in tags:
@@ -88,3 +90,6 @@ for xml_file in all_xml_files:
                 html = soup.prettify("utf-8")
                 rf.write(html)
                 rf.close()
+
+if nofilesfound:
+    print('No XML Files with "attrs" found in dir " %s "' % root_dir)
