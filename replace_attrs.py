@@ -62,7 +62,7 @@ def get_new_attrs(attrs):
     return new_attrs
 
 
-autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file)') or 'n'
+autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file) : ') or 'n'
 nofilesfound = True
 for xml_file in all_xml_files:
     with open(xml_file, 'rb') as f:
@@ -97,7 +97,7 @@ for xml_file in all_xml_files:
             attribute_tag.decompose()
         print(tags_with_attrs, attribute_tags_after)
         if autoreplace.lower()[0] == 'n':
-            confirm = input('Do you want to replace? (y/n) : (empty == no)') or 'n'
+            confirm = input('Do you want to replace? (y/n) (empty == no) : ') or 'n'
         else:
             confirm = 'y'
         if confirm.lower()[0] == 'y':
