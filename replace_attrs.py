@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import os
-from bs4 import BeautifulSoup as bs
+from bs4 import formatter, BeautifulSoup as bs
+
+xml_4indent_formatter = formatter.XMLFormatter(indent=4)
 
 def get_files_recursive(path):
     xml_files = []
@@ -88,7 +90,7 @@ for xml_file in all_xml_files:
             confirm = 'y'
         if confirm.lower()[0] == 'y':
             with open(xml_file, 'wb') as rf:
-                html = soup.prettify("utf-8")
+                html = soup.prettify("utf-8", formatter=xml_4indent_formatter)
                 rf.write(html)
                 rf.close()
 
