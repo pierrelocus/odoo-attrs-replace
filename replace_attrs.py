@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import re
 from bs4 import formatter, BeautifulSoup as bs
 
 xml_4indent_formatter = formatter.XMLFormatter(indent=4)
@@ -61,6 +62,15 @@ def get_new_attrs(attrs):
             new_attrs[attr] = stringify_attr(attrs_dict[attr])
     return new_attrs
 
+# Prettify puts <attribute> on three lines (1/ opening tag, 2/ text, 3/ closing tag), not very cool.
+# Taken from https://stackoverflow.com/questions/55962146/remove-line-breaks-and-spaces-around-span-elements-with-python-regex
+# And changed to avoid putting ALL one line, and only manage <attribute>, as it's the only one messing stuff here
+# Kinda ugly to use the 3 types of tags but tbh I keep it like this while I have no time for a regex replace keeping the name="x" :p
+def prettify_output(html):
+    for attr in {'required', 'invisible', 'readonly'}:
+        html = re.sub(f'<attribute name="{attr}">[ \n]+',f'<attribute name="{attr}">', html)
+    html = re.sub(f'[ \n]+</attribute>',f'</attribute>', html)
+    return html
 
 autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file) : ') or 'n'
 nofilesfound = True
@@ -102,8 +112,9 @@ for xml_file in all_xml_files:
             confirm = 'y'
         if confirm.lower()[0] == 'y':
             with open(xml_file, 'wb') as rf:
-                html = soup.prettify("utf-8", formatter=xml_4indent_formatter)
-                rf.write(html)
+                html = soup.prettify(formatter=xml_4indent_formatter)
+                html = prettify_output(html)
+                rf.write(html.encode('utf-8'))
                 rf.close()
 
 if nofilesfound:
