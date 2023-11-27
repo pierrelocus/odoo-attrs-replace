@@ -25,20 +25,23 @@ def stringify_attr(stack):
         if isinstance(i, str) and i in '|&':
                 keep_or_and.append(i)
         else:
+                switcher = False
                 # Replace operators not supported in python (=, like, ilike)
                 operator = str(i[1])
                 if operator == '=':
                     operator = '=='
                 elif 'like' in operator:
+                    switcher = True
                     operator = 'in'
-                # Begin with "variable oerator"
-                stringify = str(i[0]) + ' ' + operator + ' '
-                # Take care of operand, don't add quotes if it's list/tuple/set/boolean/number, check if we have a true/false/1/0 string tho.
-                operand = i[2]
-                if operand in ('True', 'False', '1', '0') or type(operand) in (list, tuple, set, int, float, bool):
-                    stringify += str(operand)
+                # Take left operand, never to add quotes (should be python object / field)
+                left_operand = i[0]
+                # Take care of right operand, don't add quotes if it's list/tuple/set/boolean/number, check if we have a true/false/1/0 string tho.
+                right_operand = i[2]
+                if right_operand in ('True', 'False', '1', '0') or type(right_operand) in (list, tuple, set, int, float, bool):
+                    right_operand = str(right_operand)
                 else:
-                    stringify += "'"+operand+"'"
+                    right_operand = "'"+right_operand+"'"
+                stringify = "%s %s %s" % (right_operand if switcher else left_operand, operator, left_operand if switcher else right_operand)
                 # if we have or/and operator, we add them reversed to when we found them
                 if len(keep_or_and):
                     stringify += ' and ' if keep_or_and.pop()=='&' else ' or '
