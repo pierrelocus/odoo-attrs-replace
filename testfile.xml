@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <form>
+        <xpath expr="//">
+            <field attrs="{'invisible': True, 'readonly': [('otherfield', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c'])]}" name="name"/>
+        </xpath>
+        <xpath expr="//." position="attributes">
+            <attribute name="attrs">{'invisible': True, 'readonly': [('otherfield', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c'])]}</attribute>
+        </xpath>
+    </form>
+</odoo>

@@ -55,11 +55,12 @@ def stringify_attr(stack):
 
 def get_new_attrs(attrs):
     new_attrs = {}
-    attrs_dict = eval(attrs)
+    attrs_dict = eval(attrs.strip())
     for attr in {'required', 'invisible', 'readonly'}:
         if attr in attrs_dict.keys():
             new_attrs[attr] = stringify_attr(attrs_dict[attr])
     return new_attrs
+
 
 autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file)') or 'n'
 nofilesfound = True
@@ -70,20 +71,31 @@ for xml_file in all_xml_files:
         if not 'attrs' in contents:
             continue
         soup = bs(contents, 'xml')
-        tags = soup.select('[attrs]')
-        if not tags:
+        tags_with_attrs = soup.select('[attrs]')
+        attribute_tags_name_attrs = soup.select('attribute[name="attrs"]')
+        if not tags_with_attrs and not attribute_tags_name_attrs:
             continue
         nofilesfound = False
         print('Taking Care of XML File : %s' % xml_file)
-        print(tags)
+        print(tags_with_attrs, attribute_tags_name_attrs)
         print('Will be replaced by')
-        for tag in tags:
+        for tag in tags_with_attrs:
             attrs = tag['attrs']
             new_attrs = get_new_attrs(attrs)
             del tag['attrs']
             for new_attr in new_attrs.keys():
                 tag[new_attr] = new_attrs[new_attr]
-        print(tags)
+        attribute_tags_after = []
+        for attribute_tag in attribute_tags_name_attrs:
+            new_attrs = get_new_attrs(attribute_tag.text)
+            for new_attr in new_attrs.keys():
+                new_tag = soup.new_tag('attribute')
+                new_tag['name'] = new_attr
+                new_tag.append(str(new_attrs[new_attr]))
+                attribute_tags_after.append(new_tag)
+                attribute_tag.insert_after(new_tag)
+            attribute_tag.decompose()
+        print(tags_with_attrs, attribute_tags_after)
         if autoreplace.lower()[0] == 'n':
             confirm = input('Do you want to replace? (y/n) : (empty == no)') or 'n'
         else:
