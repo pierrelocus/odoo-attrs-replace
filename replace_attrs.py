@@ -25,17 +25,24 @@ def stringify_attr(stack):
         if isinstance(i, str) and i in '|&':
                 keep_or_and.append(i)
         else:
+                # Replace operators not supported in python (=, like, ilike)
                 operator = str(i[1])
                 if operator == '=':
                     operator = '=='
+                elif 'like' in operator:
+                    operator = 'in'
+                # Begin with "variable oerator"
                 stringify = str(i[0]) + ' ' + operator + ' '
+                # Take care of operand, don't add quotes if it's list/tuple/set/boolean/number, check if we have a true/false/1/0 string tho.
                 operand = i[2]
-                if operand in ('True', 'False', '1', '0', True, False, 1, 0) or type(operand) in (list, tuple, set):
+                if operand in ('True', 'False', '1', '0') or type(operand) in (list, tuple, set, int, float, bool):
                     stringify += str(operand)
                 else:
                     stringify += "'"+operand+"'"
+                # if we have or/and operator, we add them reversed to when we found them
                 if len(keep_or_and):
                     stringify += ' and ' if keep_or_and.pop()=='&' else ' or '
+                # else still check if we need to add "and"s
                 elif index < len(stack) -1:
                     stringify += ' and '
                 stringified += stringify
@@ -48,7 +55,8 @@ def get_new_attrs(attrs):
         if attr in attrs_dict.keys():
             new_attrs[attr] = stringify_attr(attrs_dict[attr])
     return new_attrs
-            
+
+autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file)')
 
 for xml_file in all_xml_files:
     print('Taking Care of XML File : %s' % xml_file)
@@ -70,8 +78,11 @@ for xml_file in all_xml_files:
             for new_attr in new_attrs.keys():
                 tag[new_attr] = new_attrs[new_attr]
         print(tags)
-        confirm = input('Do you want to replace? (y/n) : (empty == no)')
-        confirm = confirm or 'n'
+        if autoreplace.lower()[0] == 'n':
+            confirm = input('Do you want to replace? (y/n) : (empty == no)')
+            confirm = confirm or 'n'
+        else:
+            confirm = 'y'
         if confirm.lower()[0] == 'y':
             with open(xml_file, 'wb') as rf:
                 html = soup.prettify("utf-8")
