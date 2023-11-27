@@ -57,7 +57,7 @@ def get_new_attrs(attrs):
     return new_attrs
 
 autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file)')
-
+autoreplace = autoreplace or 'n'
 nofilesfound = True
 for xml_file in all_xml_files:
     with open(xml_file, 'rb') as f:
