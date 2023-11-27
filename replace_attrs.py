@@ -56,8 +56,7 @@ def get_new_attrs(attrs):
             new_attrs[attr] = stringify_attr(attrs_dict[attr])
     return new_attrs
 
-autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file)')
-autoreplace = autoreplace or 'n'
+autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file)') or 'n'
 nofilesfound = True
 for xml_file in all_xml_files:
     with open(xml_file, 'rb') as f:
@@ -81,8 +80,7 @@ for xml_file in all_xml_files:
                 tag[new_attr] = new_attrs[new_attr]
         print(tags)
         if autoreplace.lower()[0] == 'n':
-            confirm = input('Do you want to replace? (y/n) : (empty == no)')
-            confirm = confirm or 'n'
+            confirm = input('Do you want to replace? (y/n) : (empty == no)') or 'n'
         else:
             confirm = 'y'
         if confirm.lower()[0] == 'y':
