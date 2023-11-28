@@ -27,3 +27,5 @@ Unless you chose in the begining 'y' for auto-replace (don't ask for each file)
 
 TODO:
   -  Support missing operators "=?", "child_of", "parent_of" (less used than the others already supported)
+
+### Happy B-day @cma-nalios (Clément) :D
