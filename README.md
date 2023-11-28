@@ -15,3 +15,7 @@ If nothing is given, it will use "." (current directory).
 The script will ask you, for each file, if you want to replace all attrs= with related attrs in the tag (for all tags at once).
 
 Unless you chose in the begining 'y' for auto-replace (don't ask for each file)
+
+
+TODO:
+  -  Support missing operators "=?", "child_of", "parent_of" (less used than the others already supported)
