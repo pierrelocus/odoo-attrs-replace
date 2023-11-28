@@ -2,7 +2,7 @@
 
 ### As Odoo changed the attrs to (no more attrs) in v17, I create this little script to help you replace all attrs in your XML files with corresponding attributes in the XML directly.
 
-### Find a flaw ?
+## Find a flaw ?
 
 Please open an Issue or make a PR or contact me on LinkedIn (Pierre Locus)
 
@@ -10,7 +10,7 @@ WITH A TEST CASE, will be much easier for me to debug with a test case to know w
 
 Thanks in advance!
 
-### How to use:
+## How to use:
 
 Simply install with pip "beautifulsoup4" (or install -r requirements.txt)
 
