@@ -19,40 +19,72 @@ root_dir = input('Enter root directory to check (empty for current directory) : 
 root_dir = root_dir or '.'
 all_xml_files = get_files_recursive(root_dir)
 
+def normalize_domain(domain):
+    """Normalize Domain, taken from odoo/osv/expression.py -> just the part so that & operators are added where needed.
+        After that, we can use a part of the def parse() from the same file to manage parenthesis for and/or"""
+    if len(domain) == 1:
+        return domain
+    result = []
+    expected = 1                            # expected number of expressions
+    op_arity = {'!': 1, '&': 2, '|': 2}
+    for token in domain:
+        if expected == 0:                   # more than expected, like in [A, B]
+            result[0:0] = ['&']             # put an extra '&' in front
+            expected = 1
+        if isinstance(token, (list, tuple)):  # domain term
+            expected -= 1
+            token = tuple(token)
+        else:
+            expected += op_arity.get(token, 0) - 1
+        result.append(token)
+    return result
+
+def stringify_leaf(leaf):
+    stringify = ''
+    switcher = False
+    # Replace operators not supported in python (=, like, ilike)
+    operator = str(leaf[1])
+    if operator == '=':
+        operator = '=='
+    elif 'like' in operator:
+        if 'not' in operator:
+            operator = 'not in'
+        else:
+            operator = 'in'
+        switcher = True
+    # Take left operand, never to add quotes (should be python object / field)
+    left_operand = leaf[0]
+    # Take care of right operand, don't add quotes if it's list/tuple/set/boolean/number, check if we have a true/false/1/0 string tho.
+    right_operand = leaf[2]
+    if right_operand in ('True', 'False', '1', '0') or type(right_operand) in (list, tuple, set, int, float, bool):
+        right_operand = str(right_operand)
+    else:
+        right_operand = "'"+right_operand+"'"
+    stringify = "%s %s %s" % (right_operand if switcher else left_operand, operator, left_operand if switcher else right_operand)
+    return stringify
+
 def stringify_attr(stack):
     if stack in (True, False, 'True', 'False', 1, 0, '1', '0'):
         return stack
-    keep_or_and = []
-    stringified = ''
-    for index, i in enumerate(stack):
-        if isinstance(i, str) and i in '|&':
-                keep_or_and.append(i)
+    last_parenthesis_index = max(index for index, item in enumerate(stack[::-1]) if item not in ('|', '!'))
+    stack = normalize_domain(stack)
+    stack = stack[::-1]
+    result = []
+    for index, leaf_or_operator in enumerate(stack):
+        if leaf_or_operator == '!':
+            expr = result.pop()
+            result.append('(not (%s))' % expr)
+        elif leaf_or_operator == '&' or leaf_or_operator == '|':
+            left = result.pop()
+            right = result.pop()
+            form = '(%s %s %s)'
+            if index > last_parenthesis_index:
+                form = '%s %s %s'
+            result.append(form % (left, 'and' if leaf_or_operator=='&' else 'or', right))
         else:
-                switcher = False
-                # Replace operators not supported in python (=, like, ilike)
-                operator = str(i[1])
-                if operator == '=':
-                    operator = '=='
-                elif 'like' in operator:
-                    switcher = True
-                    operator = 'in'
-                # Take left operand, never to add quotes (should be python object / field)
-                left_operand = i[0]
-                # Take care of right operand, don't add quotes if it's list/tuple/set/boolean/number, check if we have a true/false/1/0 string tho.
-                right_operand = i[2]
-                if right_operand in ('True', 'False', '1', '0') or type(right_operand) in (list, tuple, set, int, float, bool):
-                    right_operand = str(right_operand)
-                else:
-                    right_operand = "'"+right_operand+"'"
-                stringify = "%s %s %s" % (right_operand if switcher else left_operand, operator, left_operand if switcher else right_operand)
-                # if we have or/and operator, we add them reversed to when we found them
-                if len(keep_or_and):
-                    stringify += ' and ' if keep_or_and.pop()=='&' else ' or '
-                # else still check if we need to add "and"s
-                elif index < len(stack) -1:
-                    stringify += ' and '
-                stringified += stringify
-    return stringified
+            result.append(stringify_leaf(leaf_or_operator))
+    result = result[0]
+    return result
 
 def get_new_attrs(attrs):
     new_attrs = {}

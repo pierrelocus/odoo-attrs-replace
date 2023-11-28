@@ -4,13 +4,13 @@
 
 ### How to use:
 
-Simply install with pip beautifulsoup4 (or install -r requirements.txt)
+Simply install with pip "beautifulsoup4" and "black" (or install -r requirements.txt)
 
 Then launch the python script (python3 replace_attrs.py).
 
-If will ask you the root directory to check for XML files. You can give a full project path.
+It will ask you the root directory to check for XML files. You can give a project's absolute path.
 
-If nothing is given, we will use "." (current directory).
+If nothing is given, it will use "." (current directory).
 
 The script will ask you, for each file, if you want to replace all attrs= with related attrs in the tag (for all tags at once).
 

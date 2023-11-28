@@ -2,7 +2,9 @@
 <odoo>
     <form>
         <xpath expr="//">
-            <field attrs="{'invisible': True, 'readonly': [('otherfield', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c'])]}" name="name"/>
+            <!-- readonly should give: -->
+            <!-- (field1 == 'yes' and field2 == 'yes') or (field3 == 'yes' or field4 == 'yes') or field5 == 'yes' and field6 == 'yes' -->
+            <field attrs="{'invisible': True, 'readonly': ['|', '|', '&amp;', ('field1', '=', 'yes'), ('field2', '=', 'yes'), '|', ('field3', '=', 'yes'), ('field4', '=', 'yes'), ('field5', '=', 'yes'), ('field6', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c'])]}" name="name"/>
         </xpath>
         <xpath expr="//." position="attributes">
             <attribute name="attrs">{'invisible': True, 'readonly': [('otherfield', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c'])]}</attribute>
