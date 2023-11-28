@@ -4,7 +4,7 @@
 
 ### How to use:
 
-Simply install with pip "beautifulsoup4" and "black" (or install -r requirements.txt)
+Simply install with pip "beautifulsoup4" (or install -r requirements.txt)
 
 Then launch the python script (python3 replace_attrs.py).
 
