@@ -9,5 +9,18 @@
         <xpath expr="//." position="attributes">
             <attribute name="attrs">{'invisible': True, 'readonly': [('otherfield', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c'])]}</attribute>
         </xpath>
+        <xpath expr="//test_states_simple_case">
+            <field states="draft,done"/>
+        </xpath>
+        <xpath expr="//test_states_attrs_simple_case">
+            <attribute name="states">draft</attribute>
+        </xpath>
+        <xpath expr="//test_states_with_invisible_existing">
+            <field states="draft,done" attrs="{'invisible': [('testfield', '=', 'hello world')]}"/>
+        </xpath>
+        <xpath expr="//test_states_attrs_with_invisible_existing" position="attributes">
+            <attribute name="attrs">{'invisible': [('testfield', '=', 'hello world')]}</attribute>
+            <attribute name="states">draft,done</attribute>
+        </xpath>
     </form>
 </odoo>

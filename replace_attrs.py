@@ -104,23 +104,31 @@ for xml_file in all_xml_files:
     with open(xml_file, 'rb') as f:
         contents = f.read().decode('utf-8')
         f.close()
-        if not 'attrs' in contents:
+        if not 'attrs' in contents and not 'states' in contents:
             continue
         soup = bs(contents, 'xml')
         tags_with_attrs = soup.select('[attrs]')
         attribute_tags_name_attrs = soup.select('attribute[name="attrs"]')
-        if not tags_with_attrs and not attribute_tags_name_attrs:
+        tags_with_states = soup.select('[states]')
+        attribute_tags_name_states = soup.select('attribute[name="states"]')
+        if not (tags_with_attrs or attribute_tags_name_attrs or\
+                tags_with_states or attribute_tags_name_states):
             continue
         nofilesfound = False
-        print('Taking Care of XML File : %s' % xml_file)
-        print(tags_with_attrs, attribute_tags_name_attrs)
-        print('Will be replaced by')
+        print('\nTaking Care of XML File : %s' % xml_file)
+        print('\nTags with attrs:', tags_with_attrs)
+        print('\nAttribute tags with name=attrs:', attribute_tags_name_attrs)
+        print('\nTags with states:', tags_with_states)
+        print('\nAttribute tags with name=states:', attribute_tags_name_states)
+        print('\nWill be replaced by\n')
+        # Management of tags that have attrs=""
         for tag in tags_with_attrs:
             attrs = tag['attrs']
             new_attrs = get_new_attrs(attrs)
             del tag['attrs']
             for new_attr in new_attrs.keys():
                 tag[new_attr] = new_attrs[new_attr]
+        # Management of attributes name="attrs"
         attribute_tags_after = []
         for attribute_tag in attribute_tags_name_attrs:
             new_attrs = get_new_attrs(attribute_tag.text)
@@ -131,7 +139,45 @@ for xml_file in all_xml_files:
                 attribute_tags_after.append(new_tag)
                 attribute_tag.insert_after(new_tag)
             attribute_tag.decompose()
-        print(tags_with_attrs, attribute_tags_after)
+        # Management ot tags that have states=""
+        for state_tag in tags_with_states:
+            base_invisible = ''
+            if 'invisible' in state_tag.attrs and state_tag['invisible']:
+                base_invisible = state_tag['invisible'] + ' or '
+            invisible_attr = "state not in [%s]" % ','.join(("'" + state.strip() + "'") for state in state_tag['states'].split(','))
+            state_tag['invisible'] = base_invisible + invisible_attr
+            del state_tag['states']
+        # Management of attributes name="states"
+        attribute_tags_states_after = []
+        for attribute_tag_states in attribute_tags_name_states:
+            states = attribute_tag_states.text
+            existing_invisible_tag = False
+            # I don't know why, looking for attribute[name="invisible"] does not work,
+            # but if it exists, I can find it with findAll attribute -> loop to name="invisible"
+            for tag in attribute_tag_states.parent.findAll('attribute'):
+                if tag['name'] == 'invisible':
+                    existing_invisible_tag = tag
+                    break
+            if not existing_invisible_tag:
+                existing_invisible_tag = soup.new_tag('attribute')
+                existing_invisible_tag['name'] = 'invisible'
+            if existing_invisible_tag.text:
+                new_invisible_text = ' or '.join([existing_invisible_tag.text, 'state not in [%s]' % (
+                    ','.join(("'" + state.strip() + "'") for state in states.split(','))
+                )])
+            else:
+                new_invisible_text = 'state not in [%s]' % (
+                    ','.join(("'" + state.strip() + "'") for state in states.split(','))
+                )
+            existing_invisible_tag.string = new_invisible_text
+            attribute_tag_states.insert_after(existing_invisible_tag)
+            attribute_tag_states.decompose()
+            attribute_tags_states_after.append(existing_invisible_tag)
+
+        print('\nTags with attrs:', tags_with_attrs)
+        print('\nAttribute tags with name=attrs:', attribute_tags_after)
+        print('\nTags with states:', tags_with_states)
+        print('\nAttribute tags with name=states:', attribute_tags_states_after)
         if autoreplace.lower()[0] == 'n':
             confirm = input('Do you want to replace? (y/n) (empty == no) : ') or 'n'
         else:
