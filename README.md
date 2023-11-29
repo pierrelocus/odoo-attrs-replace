@@ -15,7 +15,7 @@ pip install -r requirements.txt
 
 Launch the python script
 ```shell
-python3 replace_attrs.py <path>
+python3 replace_attrs.py
 ```
 
 It will ask you the root directory to check for `XML` files. You can give a project's absolute path.
@@ -36,5 +36,3 @@ Thanks in advance!
 
 ## TODO:
   - [ ] Support missing operators "=?", "child_of", "parent_of" (less used than the others already supported)
-
-### Happy B-day @cma-nalios (Clément) :D
