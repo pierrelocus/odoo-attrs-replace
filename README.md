@@ -22,7 +22,7 @@ It will ask you the root directory to check for `XML` files. You can give a proj
 
 If no arguments are given, it will use the current directory.
 
-The script will ask you, for each file, if you want to replace all `attrs=` with related `attrs` in the tag (for all instances per tag).
+The script will ask you, for each file, if you want to replace all `attrs=` and `states=` with related `attrs` (invisible,readonly,required) - (invisible concatenation or creation for `states`) in the tag (for all instances per tag).
 
 Unless you chose in the beginning 'y' for auto-replace (don't ask for each file)
 
