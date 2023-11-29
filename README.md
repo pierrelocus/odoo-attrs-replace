@@ -36,3 +36,10 @@ Thanks in advance!
 
 ## TODO:
   - [ ] Support missing operators "=?", "child_of", "parent_of" (less used than the others already supported)
+
+## Contributors
+
+Thank you for your contributions:
+
+  -  @lorenuars19 for the better README
+  -  @artygo8 for the faster and cleaner get_files_recursive function
