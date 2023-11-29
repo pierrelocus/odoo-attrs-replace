@@ -1,19 +1,13 @@
 # -*- coding: utf-8 -*-
 
-import os
 import re
 from bs4 import formatter, BeautifulSoup as bs
+from pathlib import Path
 
 xml_4indent_formatter = formatter.XMLFormatter(indent=4)
 
 def get_files_recursive(path):
-    xml_files = []
-    for item in os.listdir(path):
-        if os.path.isfile(os.path.join(path, item)) and item.endswith('.xml'):
-            xml_files.append(os.path.join(path, item))
-        if os.path.isdir(os.path.join(path, item)):
-            xml_files.extend(get_files_recursive(os.path.join(path, item)))
-    return xml_files
+    return (str(p) for p in Path(path).glob('**/*.xml') if p.is_file())
 
 root_dir = input('Enter root directory to check (empty for current directory) : ')
 root_dir = root_dir or '.'
