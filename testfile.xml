@@ -1,6 +1,7 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <odoo>
     <form>
+        <field name="name">My Field</field>
         <xpath expr="//">
             <!-- readonly should give: -->
             <!-- (field1 == 'yes' and field2 == 'yes') or (field3 == 'yes' or field4 == 'yes') or field5 == 'yes' and field6 == 'yes' -->
@@ -9,7 +10,10 @@
         <xpath expr="//." position="attributes">
             <attribute name="attrs">{'invisible': True, 'readonly': [('otherfield', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c'])]}</attribute>
         </xpath>
+
         <xpath expr="//test_states_simple_case">
+            <field name="test"/>
+            <field name="test3"/>
             <field states="draft,done"/>
         </xpath>
         <xpath expr="//test_states_attrs_simple_case">

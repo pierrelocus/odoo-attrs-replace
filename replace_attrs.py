@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import re
-from bs4 import formatter, BeautifulSoup as bs
+import copy
+from bs4 import BeautifulSoup as bs
 from pathlib import Path
-
-xml_4indent_formatter = formatter.XMLFormatter(indent=4)
 
 def get_files_recursive(path):
     return (str(p) for p in Path(path).glob('**/*.xml') if p.is_file())
@@ -92,11 +90,6 @@ def get_new_attrs(attrs):
 # Taken from https://stackoverflow.com/questions/55962146/remove-line-breaks-and-spaces-around-span-elements-with-python-regex
 # And changed to avoid putting ALL one line, and only manage <attribute>, as it's the only one messing stuff here
 # Kinda ugly to use the 3 types of tags but tbh I keep it like this while I have no time for a regex replace keeping the name="x" :p
-def prettify_output(html):
-    for attr in {'required', 'invisible', 'readonly'}:
-        html = re.sub(f'<attribute name="{attr}">[ \n]+',f'<attribute name="{attr}">', html)
-    html = re.sub(f'[ \n]+</attribute>',f'</attribute>', html)
-    return html
 
 autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file) : ') or 'n'
 nofilesfound = True
@@ -122,34 +115,45 @@ for xml_file in all_xml_files:
         print('\nAttribute tags with name=states:', attribute_tags_name_states)
         print('\nWill be replaced by\n')
         # Management of tags that have attrs=""
+        all_base_tags = {}
         for tag in tags_with_attrs:
+            base_tag = copy.deepcopy(tag)
+            all_base_tags.setdefault(str(base_tag), [])
             attrs = tag['attrs']
             new_attrs = get_new_attrs(attrs)
             del tag['attrs']
             for new_attr in new_attrs.keys():
                 tag[new_attr] = new_attrs[new_attr]
+            all_base_tags[str(base_tag)].append(str(tag))
+
         # Management of attributes name="attrs"
         attribute_tags_after = []
         for attribute_tag in attribute_tags_name_attrs:
+            all_base_tags.setdefault(str(attribute_tag), [])
             new_attrs = get_new_attrs(attribute_tag.text)
             for new_attr in new_attrs.keys():
                 new_tag = soup.new_tag('attribute')
                 new_tag['name'] = new_attr
                 new_tag.append(str(new_attrs[new_attr]))
+                all_base_tags[str(attribute_tag)].append(str(new_tag))
                 attribute_tags_after.append(new_tag)
                 attribute_tag.insert_after(new_tag)
             attribute_tag.decompose()
         # Management ot tags that have states=""
         for state_tag in tags_with_states:
+            base_state_tag = copy.deepcopy(state_tag)
+            all_base_tags.setdefault(str(base_state_tag), [])
             base_invisible = ''
             if 'invisible' in state_tag.attrs and state_tag['invisible']:
                 base_invisible = state_tag['invisible'] + ' or '
             invisible_attr = "state not in [%s]" % ','.join(("'" + state.strip() + "'") for state in state_tag['states'].split(','))
             state_tag['invisible'] = base_invisible + invisible_attr
+            all_base_tags[str(base_state_tag)].append(str(state_tag))
             del state_tag['states']
         # Management of attributes name="states"
         attribute_tags_states_after = []
         for attribute_tag_states in attribute_tags_name_states:
+            all_base_tags.setdefault(str(attribute_tag_states), [])
             states = attribute_tag_states.text
             existing_invisible_tag = False
             # I don't know why, looking for attribute[name="invisible"] does not work,
@@ -170,6 +174,7 @@ for xml_file in all_xml_files:
                     ','.join(("'" + state.strip() + "'") for state in states.split(','))
                 )
             existing_invisible_tag.string = new_invisible_text
+            all_base_tags[str(attribute_tag_states)].append(str(existing_invisible_tag))
             attribute_tag_states.insert_after(existing_invisible_tag)
             attribute_tag_states.decompose()
             attribute_tags_states_after.append(existing_invisible_tag)
@@ -183,10 +188,11 @@ for xml_file in all_xml_files:
         else:
             confirm = 'y'
         if confirm.lower()[0] == 'y':
+            for current_tag, new_tags in all_base_tags.items():
+                new_tags = '\n'.join(str(tag) for tag in new_tags)
+                contents = contents.replace(str(current_tag), str(new_tags))
             with open(xml_file, 'wb') as rf:
-                html = soup.prettify(formatter=xml_4indent_formatter)
-                html = prettify_output(html)
-                rf.write(html.encode('utf-8'))
+                rf.write(contents.encode('utf-8'))
                 rf.close()
 
 if nofilesfound:
