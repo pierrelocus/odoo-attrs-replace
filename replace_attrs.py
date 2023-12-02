@@ -5,6 +5,7 @@ from bs4 import formatter, BeautifulSoup as bs
 from pathlib import Path
 
 xml_4indent_formatter = formatter.XMLFormatter(indent=4)
+NEW_ATTRS = {'required', 'invisible', 'readonly', 'column_invisible'}
 
 def get_files_recursive(path):
     return (str(p) for p in Path(path).glob('**/*.xml') if p.is_file())
@@ -83,7 +84,7 @@ def stringify_attr(stack):
 def get_new_attrs(attrs):
     new_attrs = {}
     attrs_dict = eval(attrs.strip())
-    for attr in {'required', 'invisible', 'readonly'}:
+    for attr in NEW_ATTRS:
         if attr in attrs_dict.keys():
             new_attrs[attr] = stringify_attr(attrs_dict[attr])
     return new_attrs
@@ -93,7 +94,7 @@ def get_new_attrs(attrs):
 # And changed to avoid putting ALL one line, and only manage <attribute>, as it's the only one messing stuff here
 # Kinda ugly to use the 3 types of tags but tbh I keep it like this while I have no time for a regex replace keeping the name="x" :p
 def prettify_output(html):
-    for attr in {'required', 'invisible', 'readonly'}:
+    for attr in NEW_ATTRS:
         html = re.sub(f'<attribute name="{attr}">[ \n]+',f'<attribute name="{attr}">', html)
     html = re.sub(f'[ \n]+</attribute>',f'</attribute>', html)
     return html
