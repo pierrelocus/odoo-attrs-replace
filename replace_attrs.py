@@ -189,7 +189,10 @@ for xml_file in all_xml_files:
             confirm = 'y'
         if confirm.lower()[0] == 'y':
             for current_tag, new_tags in all_base_tags.items():
-                new_tags = '\n'.join(str(tag) for tag in new_tags)
+                current_tag_position = contents.find(str(current_tag))
+                front_spaces_count = current_tag_position - contents[:current_tag_position].rfind('\n') - 1
+                sep = '\n' + ' ' * front_spaces_count
+                new_tags = sep.join(str(tag) for tag in new_tags)
                 contents = contents.replace(str(current_tag), str(new_tags))
             with open(xml_file, 'wb') as rf:
                 rf.write(contents.encode('utf-8'))
