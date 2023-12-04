@@ -29,7 +29,11 @@
                 ('test3', '=', 'hello'),
                 ('test4', 'in', [%('testmodule.test_xml_id')d, %('testmodule.test_xml_id_2')d])
             ]
-        }</attribute>
+            }</attribute>
+            <attribute name="states">draft,done</attribute>
+        </xpath>
+        <xpath expr="//test_states_attrs_with_invisible_existing_and_invisible_single_and">
+            <attribute name="attrs">{'invisible': ['&amp;', ('test8', '=', True)]}</attribute>
             <attribute name="states">draft,done</attribute>
         </xpath>
         <field name="test" attrs="{
@@ -43,5 +47,7 @@
                 ('test4', 'in', [%('testmodule.test_xml_id')d, %(testmodule.test_xml_id_2)d])
             ]
         }"/>
+        <!-- Case given by odoo, single '|' with states - can cause bug while should be accepted -->
+        <button name="action_open_action_coupon_program" attrs="{'invisible': ['|', ('allow_modification', '=', False)]}" context="{'enable_add_temporary': 1}" class="btn btn-secondary" string="Actions" type="object" states="draft,sent,sale"/>
     </form>
 </odoo>

@@ -72,7 +72,14 @@ def stringify_attr(stack):
             result.append('(not (%s))' % expr)
         elif leaf_or_operator == '&' or leaf_or_operator == '|':
             left = result.pop()
-            right = result.pop()
+            # In case of a single | or single & , we expect that it's a tag that have an attribute AND a state
+            # the state will be added as OR in states management
+            try:
+                right = result.pop()
+            except IndexError:
+                res = left + ('%s' % ' and' if leaf_or_operator=='&' else ' or')
+                result.append(res)
+                continue
             form = '(%s %s %s)'
             if index > last_parenthesis_index:
                 form = '%s %s %s'
@@ -84,8 +91,6 @@ def stringify_attr(stack):
 
 def get_new_attrs(attrs):
     new_attrs = {}
-    print('GET NEW ATTRS :')
-    print(attrs)
     attrs_dict = eval(attrs.strip())
     for attr in NEW_ATTRS:
         if attr in attrs_dict.keys():
@@ -115,11 +120,7 @@ for xml_file in all_xml_files:
         counter_for_percent_d_replace = 1
         percent_d_results = {}
         for percent_d in percent_d_regex.findall(contents):
-            print('Got percent D : ')
-            print(percent_d)
             contents = contents.replace(percent_d, "'REPLACEME%s'" % counter_for_percent_d_replace)
-            print('Changed contents, new contents:')
-            print(contents)
             percent_d_results[counter_for_percent_d_replace] = percent_d
             counter_for_percent_d_replace += 1
         soup = bs(contents, 'xml')
@@ -160,7 +161,11 @@ for xml_file in all_xml_files:
         for state_tag in tags_with_states:
             base_invisible = ''
             if 'invisible' in state_tag.attrs and state_tag['invisible']:
-                base_invisible = state_tag['invisible'] + ' or '
+                base_invisible = state_tag['invisible']
+                if not (base_invisible.endswith('or') or base_invisible.endswith('and')):
+                    base_invisible = base_invisible + ' or '
+                else:
+                    base_invisible = base_invisible + ' '
             invisible_attr = "state not in [%s]" % ','.join(("'" + state.strip() + "'") for state in state_tag['states'].split(','))
             state_tag['invisible'] = base_invisible + invisible_attr
             del state_tag['states']
@@ -179,9 +184,13 @@ for xml_file in all_xml_files:
                 existing_invisible_tag = soup.new_tag('attribute')
                 existing_invisible_tag['name'] = 'invisible'
             if existing_invisible_tag.text:
-                new_invisible_text = ' or '.join([existing_invisible_tag.text, 'state not in [%s]' % (
+                states_to_add = 'state not in [%s]' % (
                     ','.join(("'" + state.strip() + "'") for state in states.split(','))
-                )])
+                )
+                if existing_invisible_tag.text.endswith('or') or existing_invisible_tag.text.endswith('and'):
+                    new_invisible_text = '%s %s' % (existing_invisible_tag.text, states_to_add)
+                else:
+                    new_invisible_text = ' or '.join([existing_invisible_tag.text, states_to_add])
             else:
                 new_invisible_text = 'state not in [%s]' % (
                     ','.join(("'" + state.strip() + "'") for state in states.split(','))
