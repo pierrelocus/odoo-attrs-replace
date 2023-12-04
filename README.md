@@ -1,4 +1,4 @@
-# Odoo Attrs replacer
+# Odoo Attrs replacer (DEVELOP IS DEPRECATED, NOT WORKING AS GOOD AS MAIN BRANCH, BETTER NOT USE)
 As Odoo changed the attrs to (no more attrs) in v17, I created this little script to help you replace all attrs in your XML files with corresponding attributes in the XML directly.
 
 ## Dependencies
