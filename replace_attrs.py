@@ -97,6 +97,8 @@ def prettify_output(html):
     for attr in NEW_ATTRS:
         html = re.sub(f'<attribute name="{attr}">[ \n]+',f'<attribute name="{attr}">', html)
     html = re.sub(f'[ \n]+</attribute>',f'</attribute>', html)
+    html = re.sub(r'<field name="([a-z]+)">[ \n]+', r'<field name="\1">', html)
+    html = re.sub(r'[ \n]+</field>', r'</field>', html)
     return html
 
 autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file) : ') or 'n'
@@ -191,4 +193,4 @@ for xml_file in all_xml_files:
                 rf.close()
 
 if nofilesfound:
-    print('No XML Files with "attrs" found in dir " %s "' % root_dir)
+    print('No XML Files with "attrs" or "states" found in dir " %s "' % root_dir)
