@@ -6,6 +6,7 @@ from pathlib import Path
 
 xml_4indent_formatter = formatter.XMLFormatter(indent=4)
 NEW_ATTRS = {'required', 'invisible', 'readonly', 'column_invisible'}
+percent_d_regex = re.compile("%\('[\w\.\d_]+'\)d")
 
 def get_files_recursive(path):
     return (str(p) for p in Path(path).glob('**/*.xml') if p.is_file())
@@ -83,6 +84,8 @@ def stringify_attr(stack):
 
 def get_new_attrs(attrs):
     new_attrs = {}
+    print('GET NEW ATTRS :')
+    print(attrs)
     attrs_dict = eval(attrs.strip())
     for attr in NEW_ATTRS:
         if attr in attrs_dict.keys():
@@ -97,7 +100,7 @@ def prettify_output(html):
     for attr in NEW_ATTRS:
         html = re.sub(f'<attribute name="{attr}">[ \n]+',f'<attribute name="{attr}">', html)
     html = re.sub(f'[ \n]+</attribute>',f'</attribute>', html)
-    html = re.sub(r'<field name="([a-z]+)">[ \n]+', r'<field name="\1">', html)
+    html = re.sub(r'<field name="([a-z_]+)">[ \n]+', r'<field name="\1">', html)
     html = re.sub(r'[ \n]+</field>', r'</field>', html)
     return html
 
@@ -109,6 +112,16 @@ for xml_file in all_xml_files:
         f.close()
         if not 'attrs' in contents and not 'states' in contents:
             continue
+        counter_for_percent_d_replace = 1
+        percent_d_results = {}
+        for percent_d in percent_d_regex.findall(contents):
+            print('Got percent D : ')
+            print(percent_d)
+            contents = contents.replace(percent_d, "'REPLACEME%s'" % counter_for_percent_d_replace)
+            print('Changed contents, new contents:')
+            print(contents)
+            percent_d_results[counter_for_percent_d_replace] = percent_d
+            counter_for_percent_d_replace += 1
         soup = bs(contents, 'xml')
         tags_with_attrs = soup.select('[attrs]')
         attribute_tags_name_attrs = soup.select('attribute[name="attrs"]')
@@ -118,6 +131,7 @@ for xml_file in all_xml_files:
                 tags_with_states or attribute_tags_name_states):
             continue
         nofilesfound = False
+
         print('\nTaking Care of XML File : %s' % xml_file)
         print('\nTags with attrs:', tags_with_attrs)
         print('\nAttribute tags with name=attrs:', attribute_tags_name_attrs)
@@ -189,6 +203,8 @@ for xml_file in all_xml_files:
             with open(xml_file, 'wb') as rf:
                 html = soup.prettify(formatter=xml_4indent_formatter)
                 html = prettify_output(html)
+                for percent_d_result in percent_d_results.keys():
+                    html = html.replace("'REPLACEME%s'" % percent_d_result, percent_d_results[percent_d_result])
                 rf.write(html.encode('utf-8'))
                 rf.close()
 

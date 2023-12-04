@@ -19,8 +19,29 @@
             <field states="draft,done" attrs="{'invisible': [('testfield', '=', 'hello world')]}"/>
         </xpath>
         <xpath expr="//test_states_attrs_with_invisible_existing" position="attributes">
-            <attribute name="attrs">{'invisible': [('testfield', '=', 'hello world')]}</attribute>
+            <attribute name="attrs">{
+            'invisible': [
+                '|', 
+                '|',
+                '&amp;',
+                ('test1', 'in', [1, 2, 3]),
+                ('test2', 'in', [2, 3, 4]),
+                ('test3', '=', 'hello'),
+                ('test4', 'in', [%('testmodule.test_xml_id')d, %('testmodule.test_xml_id_2')d])
+            ]
+        }</attribute>
             <attribute name="states">draft,done</attribute>
         </xpath>
+        <field name="test" attrs="{
+            'invisible': [
+                '|', 
+                '|',
+                '&amp;',
+                ('test1', 'in', [1, 2, 3]),
+                ('test2', 'in', [2, 3, 4]),
+                ('test3', '=', 'hello'),
+                ('test4', 'in', [%('testmodule.test_xml_id')d, %('testmodule.test_xml_id_2')d])
+            ]
+        }"/>
     </form>
 </odoo>
