@@ -199,4 +199,4 @@ for xml_file in all_xml_files:
                 rf.close()
 
 if nofilesfound:
-    print('No XML Files with "attrs" found in dir " %s "' % root_dir)
+    print('No XML Files with "attrs" or "states" found in dir " %s "' % root_dir)
