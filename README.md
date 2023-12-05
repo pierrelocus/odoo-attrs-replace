@@ -5,7 +5,7 @@ As Odoo changed the attrs to (no more attrs) in v17, I created this little scrip
 
 Simply install with 
 ```shell
-pip install beautifulsoup4
+pip install beautifulsoup4 lxml
 ```
 OR
 ```shell

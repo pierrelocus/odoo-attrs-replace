@@ -111,111 +111,133 @@ def prettify_output(html):
 
 autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file) : ') or 'n'
 nofilesfound = True
+ok_files = []
+nok_files = []
+
 for xml_file in all_xml_files:
-    with open(xml_file, 'rb') as f:
-        contents = f.read().decode('utf-8')
-        f.close()
-        if not 'attrs' in contents and not 'states' in contents:
-            continue
-        counter_for_percent_d_replace = 1
-        percent_d_results = {}
-        for percent_d in percent_d_regex.findall(contents):
-            contents = contents.replace(percent_d, "'REPLACEME%s'" % counter_for_percent_d_replace)
-            percent_d_results[counter_for_percent_d_replace] = percent_d
-            counter_for_percent_d_replace += 1
-        soup = bs(contents, 'xml')
-        tags_with_attrs = soup.select('[attrs]')
-        attribute_tags_name_attrs = soup.select('attribute[name="attrs"]')
-        tags_with_states = soup.select('[states]')
-        attribute_tags_name_states = soup.select('attribute[name="states"]')
-        if not (tags_with_attrs or attribute_tags_name_attrs or\
-                tags_with_states or attribute_tags_name_states):
-            continue
-        nofilesfound = False
+    try:
+        with open(xml_file, 'rb') as f:
+            contents = f.read().decode('utf-8')
+            f.close()
+            if not 'attrs' in contents and not 'states' in contents:
+                continue
+            counter_for_percent_d_replace = 1
+            percent_d_results = {}
+            for percent_d in percent_d_regex.findall(contents):
+                contents = contents.replace(percent_d, "'REPLACEME%s'" % counter_for_percent_d_replace)
+                percent_d_results[counter_for_percent_d_replace] = percent_d
+                counter_for_percent_d_replace += 1
+            soup = bs(contents, 'xml')
+            tags_with_attrs = soup.select('[attrs]')
+            attribute_tags_name_attrs = soup.select('attribute[name="attrs"]')
+            tags_with_states = soup.select('[states]')
+            attribute_tags_name_states = soup.select('attribute[name="states"]')
+            if not (tags_with_attrs or attribute_tags_name_attrs or\
+                    tags_with_states or attribute_tags_name_states):
+                continue
+            print('\n################################################################')
+            print('##### Taking care of file -> %s' % xml_file)
+            print('\n########### Current tags found ###\n')
+            for t in tags_with_attrs + attribute_tags_name_attrs + tags_with_states + attribute_tags_name_states:
+                print(t)
 
-        print('\nTaking Care of XML File : %s' % xml_file)
-        print('\nTags with attrs:', tags_with_attrs)
-        print('\nAttribute tags with name=attrs:', attribute_tags_name_attrs)
-        print('\nTags with states:', tags_with_states)
-        print('\nAttribute tags with name=states:', attribute_tags_name_states)
-        print('\nWill be replaced by\n')
-        # Management of tags that have attrs=""
-        for tag in tags_with_attrs:
-            attrs = tag['attrs']
-            new_attrs = get_new_attrs(attrs)
-            del tag['attrs']
-            for new_attr in new_attrs.keys():
-                tag[new_attr] = new_attrs[new_attr]
-        # Management of attributes name="attrs"
-        attribute_tags_after = []
-        for attribute_tag in attribute_tags_name_attrs:
-            new_attrs = get_new_attrs(attribute_tag.text)
-            for new_attr in new_attrs.keys():
-                new_tag = soup.new_tag('attribute')
-                new_tag['name'] = new_attr
-                new_tag.append(str(new_attrs[new_attr]))
-                attribute_tags_after.append(new_tag)
-                attribute_tag.insert_after(new_tag)
-            attribute_tag.decompose()
-        # Management ot tags that have states=""
-        for state_tag in tags_with_states:
-            base_invisible = ''
-            if 'invisible' in state_tag.attrs and state_tag['invisible']:
-                base_invisible = state_tag['invisible']
-                if not (base_invisible.endswith('or') or base_invisible.endswith('and')):
-                    base_invisible = base_invisible + ' or '
+            nofilesfound = False
+            # Management of tags that have attrs=""
+            for tag in tags_with_attrs:
+                attrs = tag['attrs']
+                new_attrs = get_new_attrs(attrs)
+                del tag['attrs']
+                for new_attr in new_attrs.keys():
+                    tag[new_attr] = new_attrs[new_attr]
+            # Management of attributes name="attrs"
+            attribute_tags_after = []
+            for attribute_tag in attribute_tags_name_attrs:
+                new_attrs = get_new_attrs(attribute_tag.text)
+                for new_attr in new_attrs.keys():
+                    new_tag = soup.new_tag('attribute')
+                    new_tag['name'] = new_attr
+                    new_tag.append(str(new_attrs[new_attr]))
+                    attribute_tags_after.append(new_tag)
+                    attribute_tag.insert_after(new_tag)
+                attribute_tag.decompose()
+            # Management ot tags that have states=""
+            for state_tag in tags_with_states:
+                base_invisible = ''
+                if 'invisible' in state_tag.attrs and state_tag['invisible']:
+                    base_invisible = state_tag['invisible']
+                    if not (base_invisible.endswith('or') or base_invisible.endswith('and')):
+                        base_invisible = base_invisible + ' or '
+                    else:
+                        base_invisible = base_invisible + ' '
+                invisible_attr = "state not in [%s]" % ','.join(("'" + state.strip() + "'") for state in state_tag['states'].split(','))
+                state_tag['invisible'] = base_invisible + invisible_attr
+                del state_tag['states']
+            # Management of attributes name="states"
+            attribute_tags_states_after = []
+            for attribute_tag_states in attribute_tags_name_states:
+                states = attribute_tag_states.text
+                existing_invisible_tag = False
+                # I don't know why, looking for attribute[name="invisible"] does not work,
+                # but if it exists, I can find it with findAll attribute -> loop to name="invisible"
+                for tag in attribute_tag_states.parent.findAll('attribute'):
+                    if tag['name'] == 'invisible':
+                        existing_invisible_tag = tag
+                        break
+                if not existing_invisible_tag:
+                    existing_invisible_tag = soup.new_tag('attribute')
+                    existing_invisible_tag['name'] = 'invisible'
+                if existing_invisible_tag.text:
+                    states_to_add = 'state not in [%s]' % (
+                        ','.join(("'" + state.strip() + "'") for state in states.split(','))
+                    )
+                    if existing_invisible_tag.text.endswith('or') or existing_invisible_tag.text.endswith('and'):
+                        new_invisible_text = '%s %s' % (existing_invisible_tag.text, states_to_add)
+                    else:
+                        new_invisible_text = ' or '.join([existing_invisible_tag.text, states_to_add])
                 else:
-                    base_invisible = base_invisible + ' '
-            invisible_attr = "state not in [%s]" % ','.join(("'" + state.strip() + "'") for state in state_tag['states'].split(','))
-            state_tag['invisible'] = base_invisible + invisible_attr
-            del state_tag['states']
-        # Management of attributes name="states"
-        attribute_tags_states_after = []
-        for attribute_tag_states in attribute_tags_name_states:
-            states = attribute_tag_states.text
-            existing_invisible_tag = False
-            # I don't know why, looking for attribute[name="invisible"] does not work,
-            # but if it exists, I can find it with findAll attribute -> loop to name="invisible"
-            for tag in attribute_tag_states.parent.findAll('attribute'):
-                if tag['name'] == 'invisible':
-                    existing_invisible_tag = tag
-                    break
-            if not existing_invisible_tag:
-                existing_invisible_tag = soup.new_tag('attribute')
-                existing_invisible_tag['name'] = 'invisible'
-            if existing_invisible_tag.text:
-                states_to_add = 'state not in [%s]' % (
-                    ','.join(("'" + state.strip() + "'") for state in states.split(','))
-                )
-                if existing_invisible_tag.text.endswith('or') or existing_invisible_tag.text.endswith('and'):
-                    new_invisible_text = '%s %s' % (existing_invisible_tag.text, states_to_add)
-                else:
-                    new_invisible_text = ' or '.join([existing_invisible_tag.text, states_to_add])
+                    new_invisible_text = 'state not in [%s]' % (
+                        ','.join(("'" + state.strip() + "'") for state in states.split(','))
+                    )
+                existing_invisible_tag.string = new_invisible_text
+                attribute_tag_states.insert_after(existing_invisible_tag)
+                attribute_tag_states.decompose()
+                attribute_tags_states_after.append(existing_invisible_tag)
+            
+            print('\n########### Will be replaced by ###\n')
+            for t in tags_with_attrs + attribute_tags_after + tags_with_states + attribute_tags_states_after:
+                print(t)
+            print('################################################################\n')
+            if autoreplace.lower()[0] == 'n':
+                confirm = input('Do you want to replace? (y/n) (empty == no) : ') or 'n'
             else:
-                new_invisible_text = 'state not in [%s]' % (
-                    ','.join(("'" + state.strip() + "'") for state in states.split(','))
-                )
-            existing_invisible_tag.string = new_invisible_text
-            attribute_tag_states.insert_after(existing_invisible_tag)
-            attribute_tag_states.decompose()
-            attribute_tags_states_after.append(existing_invisible_tag)
+                confirm = 'y'
+            if confirm.lower()[0] == 'y':
+                with open(xml_file, 'wb') as rf:
+                    html = soup.prettify(formatter=xml_4indent_formatter)
+                    html = prettify_output(html)
+                    for percent_d_result in percent_d_results.keys():
+                        html = html.replace("'REPLACEME%s'" % percent_d_result, percent_d_results[percent_d_result])
+                    rf.write(html.encode('utf-8'))
+                    ok_files.append(xml_file)
+    except Exception as e:
+        nok_files.append((xml_file, e))
 
-        print('\nTags with attrs:', tags_with_attrs)
-        print('\nAttribute tags with name=attrs:', attribute_tags_after)
-        print('\nTags with states:', tags_with_states)
-        print('\nAttribute tags with name=states:', attribute_tags_states_after)
-        if autoreplace.lower()[0] == 'n':
-            confirm = input('Do you want to replace? (y/n) (empty == no) : ') or 'n'
-        else:
-            confirm = 'y'
-        if confirm.lower()[0] == 'y':
-            with open(xml_file, 'wb') as rf:
-                html = soup.prettify(formatter=xml_4indent_formatter)
-                html = prettify_output(html)
-                for percent_d_result in percent_d_results.keys():
-                    html = html.replace("'REPLACEME%s'" % percent_d_result, percent_d_results[percent_d_result])
-                rf.write(html.encode('utf-8'))
-                rf.close()
+print('\n################################################')
+print('################## Run  Debug ##################')
+print('################################################')
 
 if nofilesfound:
     print('No XML Files with "attrs" or "states" found in dir " %s "' % root_dir)
+
+print('Succeeded on files')
+for file in ok_files:
+    print(file)
+if not ok_files:
+    print('No files')
+print('')
+print('Failed on files')
+for file in nok_files:
+    print(file[0])
+    print('Reason: ', file[1])
+if not nok_files:
+    print('No files')
