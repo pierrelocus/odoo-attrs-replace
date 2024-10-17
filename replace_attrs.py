@@ -5,7 +5,7 @@ from pathlib import Path
 
 xml_4indent_formatter = formatter.XMLFormatter(indent=4)
 NEW_ATTRS = {'required', 'invisible', 'readonly', 'column_invisible'}
-percent_d_regex = re.compile("%\('?\"?[\w\.\d_]+'?\"?\)d")
+percent_d_regex = re.compile(r"%\('?\"?[\w\.\d_]+'?\"?\)d")
 
 
 def get_files_recursive(path):
