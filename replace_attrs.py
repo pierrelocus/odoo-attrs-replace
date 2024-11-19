@@ -41,6 +41,7 @@ def normalize_domain(domain):
 def stringify_leaf(leaf):
     stringify = ''
     switcher = False
+    case_insensitive = False
     # Replace operators not supported in python (=, like, ilike)
     operator = str(leaf[1])
     # Take left operand, never to add quotes (should be python object / field)
@@ -63,11 +64,19 @@ def stringify_leaf(leaf):
             return f"not {left_operand}"
     # Handle 'like' and other operators
     elif 'like' in operator:
-        if 'not' in operator:
-            operator = 'not in'
+        case_insensitive = 'ilike' in operator
+        if type(right_operand) == str and re.search('[_%]', right_operand):
+            # Since wildcards won't work/be recognized after conversion we throw an error so we don't end up with
+            # expressions that behave differently from their originals
+            raise Exception("Script doesn't support 'like' domains with wildcards")
+        if operator in ['=like', '=ilike']:
+            operator = '=='
         else:
-            operator = 'in'
-        switcher = True
+            if 'not' in operator:
+                operator = 'not in'
+            else:
+                operator = 'in'
+            switcher = True
     if type(right_operand) == str:
         if re.search('^__field_or_context__\.', right_operand):
             right_operand = re.sub('^__field_or_context__\.(.*)', '\\1', right_operand)
@@ -77,7 +86,10 @@ def stringify_leaf(leaf):
         temp_operand = left_operand
         left_operand = right_operand
         right_operand = temp_operand
-    stringify = f"{left_operand} {operator} {right_operand}"
+    if not case_insensitive:
+        stringify = f"{left_operand} {operator} {right_operand}"
+    else:
+        stringify = f"{left_operand}.lower() {operator} {right_operand}.lower()"
     return stringify
 
 
