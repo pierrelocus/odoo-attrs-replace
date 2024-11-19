@@ -3,20 +3,20 @@
     <form>
         <xpath expr="//">
             <!-- readonly should give: -->
-            <!-- (field1 == 'yes' and field2 == 'yes') or (field3 == 'yes' or field4 == 'yes') or field5 == 'yes' and field6 == 'yes' -->
-            <field attrs="{'invisible': True, 'readonly': ['|', '|', '&amp;', ('field1', '=', 'yes'), ('field2', '=', 'yes'), '|', ('field3', '=', 'yes'), ('field4', '=', 'yes'), ('field5', '=', 'yes'), ('field6', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c'])], 'column_invisible': 0}" name="name"/>
+            <!-- (field1 == 'yes' and field2 != parent.some_field) or (field3 == uid or 'some-string'.lower() in field4.lower()) or 'yes' not in field5 and field6 == 'yes' -->
+            <field string="foo" attrs="{'invisible': True, 'readonly': ['|', '|', '&amp;', ('field1', '=', 'yes'), ('field2', '!=', parent.some_field), '|', ('field3', '=', uid), ('field4', '=ilike', 'some-string'), ('field5', 'not like', 'yes'), ('field6', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c']), ('otherfield', '=?', some_field)], 'column_invisible': 0}" name="name"/>
         </xpath>
         <xpath expr="//." position="attributes">
             <attribute name="attrs">{'invisible': True, 'readonly': [('otherfield', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c'])], 'column_invisible': 0}</attribute>
         </xpath>
         <xpath expr="//field" position="attributes">
-            <attribute name="attrs">{'invisible': [('some', '=', False), ('other', '!=', False)], 'readonly': [('some', '=', True), ('other', '!=', True)], 'required': [('field', '=', []), ('other', '!=', [])], 'column_invisible': 0}</attribute>
+            <attribute name="attrs">{'invisible': [('some', '=', False), ('other', '!=', False)], 'readonly': [('some', '=', True), ('other', '!=', True)], 'required': [('some', '=', []), ('other', '!=', [])], 'column_invisible': [('some', '=', 'str'), ('other', '!=', 'str')]}</attribute>
         </xpath>
         <xpath expr="//test_states_simple_case">
             <field states="draft,done"/>
         </xpath>
         <xpath expr="//test_states_attrs_simple_case">
-            <attribute name="states">draft</attribute>
+            <attribute name="states">draft,done</attribute>
         </xpath>
         <xpath expr="//test_states_with_invisible_existing">
             <field states="draft,done" attrs="{'invisible': [('testfield', '=', 'hello world')]}"/>
@@ -24,7 +24,7 @@
         <xpath expr="//test_states_attrs_with_invisible_existing" position="attributes">
             <attribute name="attrs">{
             'invisible': [
-                '|', 
+                '|',
                 '|',
                 '&amp;',
                 ('test1', 'in', [1, 2, 3]),
@@ -41,7 +41,7 @@
         </xpath>
         <field name="test" attrs="{
             'invisible': [
-                '|', 
+                '|',
                 '|',
                 '&amp;',
                 ('test1', 'in', [1, 2, 3]),
