@@ -43,20 +43,24 @@ def stringify_leaf(leaf):
     switcher = False
     # Replace operators not supported in python (=, like, ilike)
     operator = str(leaf[1])
+    # Take left operand, never to add quotes (should be python object / field)
+    left_operand = leaf[0]
+    # Take care of right operand, don't add quotes if it's list/tuple/set/boolean/number, check if we have a true/false/1/0 string tho.
+    right_operand = leaf[2]
 
     # Handle '='
     if operator == '=':
-        if leaf[2] in (False, []):  # Check for False or empty list
-            return f'not {leaf[0]}'
-        elif leaf[2]:  # Check for True
-            return leaf[0]
+        if right_operand in (False, []):  # Check for False or empty list
+            return f"not {left_operand}"
+        elif right_operand == True:  # Check for True using '==' comparison so only boolean values can evaluate to True
+            return left_operand
         operator = '=='
     # Handle '!='
     elif operator == '!=':
-        if leaf[2] in (False, []):  # Check for False or empty list
-            return leaf[0]
-        elif leaf[2]:  # Check for True
-            return f'not {leaf[0]}'
+        if right_operand in (False, []):  # Check for False or empty list
+            return left_operand
+        elif right_operand == True:  # Check for True using '==' comparison so only boolean values can evaluate to True
+            return f"not {left_operand}"
     # Handle 'like' and other operators
     elif 'like' in operator:
         if 'not' in operator:
@@ -64,15 +68,15 @@ def stringify_leaf(leaf):
         else:
             operator = 'in'
         switcher = True
-    # Take left operand, never to add quotes (should be python object / field)
-    left_operand = leaf[0]
-    # Take care of right operand, don't add quotes if it's list/tuple/set/boolean/number, check if we have a true/false/1/0 string tho.
-    right_operand = leaf[2]
     if right_operand in ('True', 'False', '1', '0') or type(right_operand) in (list, tuple, set, int, float, bool):
         right_operand = str(right_operand)
     else:
         right_operand = "'" + right_operand + "'"
-    stringify = "%s %s %s" % (right_operand if switcher else left_operand, operator, left_operand if switcher else right_operand)
+    if switcher:
+        temp_operand = left_operand
+        left_operand = right_operand
+        right_operand = temp_operand
+    stringify = f"{left_operand} {operator} {right_operand}"
     return stringify
 
 
@@ -87,7 +91,7 @@ def stringify_attr(stack):
         if leaf_or_operator == '!':
             expr = result.pop()
             result.append('(not (%s))' % expr)
-        elif leaf_or_operator == '&' or leaf_or_operator == '|':
+        elif leaf_or_operator in ['&', '|']:
             left = result.pop()
             # In case of a single | or single & , we expect that it's a tag that have an attribute AND a state
             # the state will be added as OR in states management
