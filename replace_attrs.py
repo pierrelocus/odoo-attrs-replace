@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 import re
-from bs4 import formatter, BeautifulSoup as bs
 from pathlib import Path
+from lxml import etree
 
-xml_4indent_formatter = formatter.XMLFormatter(indent=4)
 NEW_ATTRS = {'required', 'invisible', 'readonly', 'column_invisible'}
 
 
@@ -104,10 +103,10 @@ def stringify_leaf(leaf):
 def stringify_attr(stack):
     """
     :param bool|str|int|list stack:
-    :rtype: bool|str|int
+    :rtype: str
     """
     if stack in (True, False, 'True', 'False', 1, 0, '1', '0'):
-        return stack
+        return str(stack)
     last_parenthesis_index = max(index for index, item in enumerate(stack[::-1]) if item not in ('|', '!'))
     stack = normalize_domain(stack)
     stack = stack[::-1]
@@ -158,23 +157,51 @@ def get_new_attrs(attrs):
     return new_attrs
 
 
-# Prettify puts <attribute> on three lines (1/ opening tag, 2/ text, 3/ closing tag), not very cool.
-# Taken from https://stackoverflow.com/questions/55962146/remove-line-breaks-and-spaces-around-span-elements-with-python-regex
-# And changed to avoid putting ALL one line, and only manage <attribute>, as it's the only one messing stuff here
-# Kinda ugly to use the 3 types of tags but tbh I keep it like this while I have no time for a regex replace keeping the name="x" :p
-def prettify_output(html):
-    for attr in NEW_ATTRS:
-        html = re.sub(f'<attribute name="{attr}">[ \n]+', f'<attribute name="{attr}">', html)
-    html = re.sub(f'[ \n]+</attribute>', f'</attribute>', html)
-    html = re.sub(r'<field name="([a-z_]+)">[ \n]+', r'<field name="\1">', html)
-    html = re.sub(r'[ \n]+</field>', r'</field>', html)
-    return html
-
-
 autoreplace = input('Do you want to auto-replace attributes ? (y/n) (empty == no) (will not ask confirmation for each file) : ') or 'n'
 nofilesfound = True
 ok_files = []
 nok_files = []
+
+
+def get_parent_etree_node(root_node, target_node):
+    """
+    Returns the parent node of a given node, and the index and indentation of the target node in the parent node's direct child nodes list
+    :param xml.etree.ElementTree.Element root_node:
+    :param xml.etree.ElementTree.Element target_node:
+    :returns: index, parent_node, indentation
+    :rtype: (int, xml.etree.ElementTree.Element, str)
+    """
+    for parent_elem in root_node.iter():
+        previous_child = False
+        for i, child in enumerate(list(parent_elem)):
+            if child == target_node:
+                if previous_child:
+                    indent = previous_child.tail
+                else:
+                    # For the first child element it's the text in between the parent's opening tag and the first child that determines indentation
+                    indent = parent_elem.text
+                return i, parent_elem, indent
+            previous_child = child
+
+
+def get_combined_invisible_condition(existing_invisible_condition, states_string):
+    """
+    :param str existing_invisible_condition: invisible attribute condition already present on the same tag as the states
+    :param str states_string: string of the form 'state1,state2,...'
+    """
+    states_list = re.split(r"\s*,\s*", states_string.strip())
+    states_to_add = f"state not in {states_list}"
+    if not states_string:
+        return existing_invisible_condition
+    if existing_invisible_condition:
+        if existing_invisible_condition.endswith('or') or existing_invisible_condition.endswith('and'):
+            combined_invisible_condition = f"{existing_invisible_condition} {states_to_add}"
+        else:
+            combined_invisible_condition = f"{existing_invisible_condition} or {states_to_add}"
+    else:
+        combined_invisible_condition = states_to_add
+    return combined_invisible_condition
+
 
 for xml_file in all_xml_files:
     try:
@@ -183,98 +210,137 @@ for xml_file in all_xml_files:
             f.close()
             if not 'attrs' in contents and not 'states' in contents:
                 continue
-            soup = bs(contents, 'xml')
-            tags_with_attrs = soup.select('[attrs]')
-            attribute_tags_name_attrs = soup.select('attribute[name="attrs"]')
-            tags_with_states = soup.select('[states]')
-            attribute_tags_name_states = soup.select('attribute[name="states"]')
-            if not (tags_with_attrs or attribute_tags_name_attrs or \
-                    tags_with_states or attribute_tags_name_states):
+            convert_line_separator_back_to_windows = False
+            if '\r\n' in contents:
+                # The ElementTree parser parses line separators as '\n', so to ensure we don't change the line separator
+                # when updating the file we should convert the '\n' back to '\r\n' after serializing the ElementTree
+                convert_line_separator_back_to_windows = True
+            # etree can't parse xml strings with an encoding declaration, so first we strip this from the file content
+            # we'll then re-add the declaration once we convert the ElementTree back to its string representation
+            has_encoding_declaration = False
+            if encoding_declaration := re.search(r"\A.*<\?xml.*?encoding=.*?\?>\s*", contents, re.DOTALL):
+                has_encoding_declaration = True
+                contents = re.sub(r"\A.*<\?xml.*?encoding=.*?\?>\s*", "", contents, re.DOTALL)
+            # Parse the document int an ElementTree
+            doc = etree.fromstring(contents)
+            tags_with_attrs = doc.xpath("//*[@attrs]")
+            attribute_tags_with_attrs = doc.xpath("//attribute[@name='attrs']")
+            tags_with_states = doc.xpath("//*[@states]")
+            attribute_tags_with_states = doc.xpath("//attribute[@name='states']")
+            if not (tags_with_attrs or attribute_tags_with_attrs or tags_with_states or attribute_tags_with_states):
                 continue
-            print('\n################################################################')
+            print('\n#############################' + ((6 + len(xml_file)) * '#'))
             print('##### Taking care of file -> %s' % xml_file)
-            print('\n########### Current tags found ###\n')
-            for t in tags_with_attrs + attribute_tags_name_attrs + tags_with_states + attribute_tags_name_states:
-                print(t)
+            print('\n##### Current tags found #####\n')
+            for t in tags_with_attrs + attribute_tags_with_attrs + tags_with_states + attribute_tags_with_states:
+                print(etree.tostring(t, encoding='unicode'))
 
             nofilesfound = False
             # Management of tags that have attrs=""
             for tag in tags_with_attrs:
-                attrs = tag['attrs']
+                attrs = tag.attrib.get('attrs')
                 new_attrs = get_new_attrs(attrs)
-                del tag['attrs']
-                for new_attr in new_attrs.keys():
-                    tag[new_attr] = new_attrs[new_attr]
+                all_attributes = []
+                # TODO: combine existing and new invisible, required, readonly and column_invisible attributes
+                # If both an attrs and one of these attributes are present at the same time, if the attribute is True
+                # then it overrides the domain in the attrs dict. If it is false then the value in the attrs dict has
+                # priority instead
+                for attr_name, attr_value in list(tag.attrib.items()):
+                    # We have to rebuild the attributes to maintain their order
+                    if attr_name == 'attrs':
+                        # Insert the new attributes in their original position, in their original order
+                        ordered_new_attrs = re.findall(rf"['\"]({'|'.join(NEW_ATTRS)})['\"]\s*:", attrs)
+                        for new_attr in ordered_new_attrs:
+                            all_attributes.append((new_attr, new_attrs.get(new_attr)))
+                    else:
+                        all_attributes.append((attr_name, attr_value))
+                tag.attrib.clear()
+                tag.attrib.update(all_attributes)
+
             # Management of attributes name="attrs"
-            attribute_tags_after = []
-            for attribute_tag in attribute_tags_name_attrs:
-                new_attrs = get_new_attrs(attribute_tag.text)
-                for new_attr in new_attrs.keys():
-                    new_tag = soup.new_tag('attribute')
-                    new_tag['name'] = new_attr
-                    new_tag.append(str(new_attrs[new_attr]))
-                    attribute_tags_after.append(new_tag)
-                    attribute_tag.insert_after(new_tag)
-                attribute_tag.decompose()
-            # Management ot tags that have states=""
+            attribute_tags_with_attrs_after = []
+            for attribute_tag in attribute_tags_with_attrs:
+                tag_index, parent_tag, indent = get_parent_etree_node(doc, attribute_tag)
+                tail = attribute_tag.tail or ''
+                attrs = attribute_tag.text
+                new_attrs = get_new_attrs(attrs)
+                # Insert the new attributes tags in their original position, in their original order in that attrs dict
+                ordered_new_attrs = re.findall(rf"['\"]({'|'.join(NEW_ATTRS)})['\"]\s*:", attrs)
+                for new_attr in ordered_new_attrs:
+                    new_tag = etree.Element('attribute', attrib={
+                        'name': new_attr
+                    })
+                    new_tag.text = str(new_attrs.get(new_attr))
+                    # First set the tail so that all following new attribute tags have the same indentation
+                    new_tag.tail = indent
+                    parent_tag.insert(tag_index, new_tag)
+                    attribute_tags_with_attrs_after.append(new_tag)
+                    tag_index += 1
+                # Then set the tail of the last added tag so that the following tags maintain their original indentation
+                new_tag.tail = tail
+                parent_tag.remove(attribute_tag)
+
+            # Management of tags that have states=""
             for state_tag in tags_with_states:
                 base_invisible = ''
-                if 'invisible' in state_tag.attrs and state_tag['invisible']:
-                    base_invisible = state_tag['invisible']
-                    if not (base_invisible.endswith('or') or base_invisible.endswith('and')):
-                        base_invisible = base_invisible + ' or '
-                    else:
-                        base_invisible = base_invisible + ' '
-                invisible_attr = "state not in [%s]" % ','.join(("'" + state.strip() + "'") for state in state_tag['states'].split(','))
-                state_tag['invisible'] = base_invisible + invisible_attr
-                del state_tag['states']
-            # Management of attributes name="states"
-            attribute_tags_states_after = []
-            for attribute_tag_states in attribute_tags_name_states:
-                states = attribute_tag_states.text
-                existing_invisible_tag = False
-                # I don't know why, looking for attribute[name="invisible"] does not work,
-                # but if it exists, I can find it with findAll attribute -> loop to name="invisible"
-                for tag in attribute_tag_states.parent.findAll('attribute'):
-                    if tag['name'] == 'invisible':
-                        existing_invisible_tag = tag
-                        break
-                if not existing_invisible_tag:
-                    existing_invisible_tag = soup.new_tag('attribute')
-                    existing_invisible_tag['name'] = 'invisible'
-                if existing_invisible_tag.text:
-                    states_to_add = 'state not in [%s]' % (
-                        ','.join(("'" + state.strip() + "'") for state in states.split(','))
-                    )
-                    if existing_invisible_tag.text.endswith('or') or existing_invisible_tag.text.endswith('and'):
-                        new_invisible_text = '%s %s' % (existing_invisible_tag.text, states_to_add)
-                    else:
-                        new_invisible_text = ' or '.join([existing_invisible_tag.text, states_to_add])
-                else:
-                    new_invisible_text = 'state not in [%s]' % (
-                        ','.join(("'" + state.strip() + "'") for state in states.split(','))
-                    )
-                existing_invisible_tag.string = new_invisible_text
-                attribute_tag_states.insert_after(existing_invisible_tag)
-                attribute_tag_states.decompose()
-                attribute_tags_states_after.append(existing_invisible_tag)
+                invisible_attribute = state_tag.get('invisible', '')
+                new_invisible_attr = get_combined_invisible_condition(invisible_attribute,
+                                                                      state_tag.attrib.get('states', ''))
+                all_attributes = []
+                for attr_name, attr_value in list(state_tag.attrib.items()):
+                    # We have to rebuild the attributes to maintain their order
+                    if attr_name == 'invisible' or (attr_name == 'states' and not invisible_attribute):
+                        # Update invisible attribute if it exists, else replace the states attribute
+                        all_attributes.append(('invisible', new_invisible_attr))
+                    elif attr_name != 'states':
+                        # Don't keep the states attribute
+                        all_attributes.append((attr_name, attr_value))
+                state_tag.attrib.clear()
+                state_tag.attrib.update(all_attributes)
 
-            print('\n########### Will be replaced by ###\n')
-            for t in tags_with_attrs + attribute_tags_after + tags_with_states + attribute_tags_states_after:
-                print(t)
-            print('################################################################\n')
+            # Management of attributes name="states"
+            attribute_tags_with_states_after = []
+            for attribute_tag_states in attribute_tags_with_states:
+                tag_index, parent_tag, indent = get_parent_etree_node(doc, attribute_tag_states)
+                tail = attribute_tag_states.tail
+                if invisible_tags := parent_tag.xpath("./attribute[@name='invisible']"):
+                    attribute_tag_invisible = invisible_tags[0]
+                    if tag_index > 0:
+                        invisible_tag_index, invisible_parent_tag, invisible_indent = get_parent_etree_node(doc, attribute_tag_invisible)
+                        if invisible_tag_index == tag_index - 1:
+                            # If the attrs and invisible tags directly follow each other the tail of the invisible tag
+                            # has to be updated, since otherwise the element after the states tag will get indented the
+                            # same as the states tag
+                            attribute_tag_invisible.tail = attribute_tag_states.tail
+                else:
+                    # If no invisible attribute tag exists, add it in place of the original states attribute tag
+                    attribute_tag_invisible = etree.Element('attribute', attrib={'name': 'invisible'})
+                    attribute_tag_invisible.tail = tail
+                    parent_tag.insert(tag_index, attribute_tag_invisible)
+                parent_tag.remove(attribute_tag_states)
+                invisible_condition = get_combined_invisible_condition(attribute_tag_invisible.text,
+                                                                       attribute_tag_states.text)
+                attribute_tag_invisible.text = invisible_condition
+                attribute_tags_with_states_after.append(attribute_tag_invisible)
+
+            print('\n##### Will be replaced by #####\n')
+            for t in tags_with_attrs + attribute_tags_with_attrs_after + tags_with_states + attribute_tags_with_states_after:
+                print(etree.tostring(t, encoding='unicode'))
+            print('\n###############################\n')
             if autoreplace.lower()[0] == 'n':
                 confirm = input('Do you want to replace? (y/n) (empty == no) : ') or 'n'
             else:
                 confirm = 'y'
             if confirm.lower()[0] == 'y':
                 with open(xml_file, 'wb') as rf:
-                    html = soup.prettify(formatter=xml_4indent_formatter)
-                    html = prettify_output(html)
-                    rf.write(html.encode('utf-8'))
+                    xml_string = etree.tostring(doc, encoding='utf-8', xml_declaration=has_encoding_declaration)
+                    if convert_line_separator_back_to_windows:
+                        xml_string = xml_string.replace(b"\n", b"\r\n")
+                    rf.write(xml_string)
                     ok_files.append(xml_file)
     except Exception as e:
         nok_files.append((xml_file, e))
+
 
 print('\n################################################')
 print('################## Run  Debug ##################')
