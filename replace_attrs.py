@@ -17,8 +17,11 @@ all_xml_files = get_files_recursive(root_dir)
 
 
 def normalize_domain(domain):
-    """Normalize Domain, taken from odoo/osv/expression.py -> just the part so that & operators are added where needed.
-        After that, we can use a part of the def parse() from the same file to manage parenthesis for and/or"""
+    """
+    Normalize Domain, taken from odoo/osv/expression.py -> just the part so that & operators are added where needed.
+    After that, we can use a part of the def parse() from the same file to manage parenthesis for and/or
+    :rtype: list[str|tuple]
+    """
     if len(domain) == 1:
         return domain
     result = []
@@ -38,6 +41,10 @@ def normalize_domain(domain):
 
 
 def stringify_leaf(leaf):
+    """
+    :param tuple leaf:
+    :rtype: str
+    """
     stringify = ''
     switcher = False
     case_insensitive = False
@@ -95,6 +102,10 @@ def stringify_leaf(leaf):
 
 
 def stringify_attr(stack):
+    """
+    :param bool|str|int|list stack:
+    :rtype: bool|str|int
+    """
     if stack in (True, False, 'True', 'False', 1, 0, '1', '0'):
         return stack
     last_parenthesis_index = max(index for index, item in enumerate(stack[::-1]) if item not in ('|', '!'))
@@ -126,6 +137,10 @@ def stringify_attr(stack):
 
 
 def get_new_attrs(attrs):
+    """
+    :param str attrs:
+    :rtype: dict[bool|str|int]
+    """
     new_attrs = {}
     # Temporarily replace dynamic variables (field reference, context value, %()d) in leafs by strings prefixed with '__dynamic_variable__.'
     # This way the evaluation won't fail on these strings and we can later identify them to convert back to  their original values
