@@ -49,8 +49,16 @@ def stringify_leaf(leaf):
     # Take care of right operand, don't add quotes if it's list/tuple/set/boolean/number, check if we have a true/false/1/0 string tho.
     right_operand = leaf[2]
 
+    # Handle '=?'
+    if operator == '=?':
+        if type(right_operand) == str:
+            if re.search('^__field_or_context__\.', right_operand):
+                right_operand = re.sub('^__field_or_context__\.(.*)', '\\1', right_operand)
+            else:
+                right_operand = f"'{right_operand}'"
+        return f"({right_operand} in [None, False] or {left_operand} == {right_operand})"
     # Handle '='
-    if operator == '=':
+    elif operator == '=':
         if right_operand in (False, []):  # Check for False or empty list
             return f"not {left_operand}"
         elif right_operand == True:  # Check for True using '==' comparison so only boolean values can evaluate to True
