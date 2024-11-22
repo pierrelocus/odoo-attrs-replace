@@ -11,6 +11,7 @@
         </xpath>
         <xpath expr="//field" position="attributes">
             <attribute name="attrs">{'invisible': [('some', '=', False), ('other', '!=', False)], 'readonly': [('some', '=', True), ('other', '!=', True)], 'required': [('some', '=', []), ('other', '!=', [])], 'column_invisible': [('some', '=', 'str'), ('other', '!=', 'str')]}</attribute>
+            <attribute name="indent_test"/>
         </xpath>
         <xpath expr="//test_states_simple_case">
             <field states="draft,done"/>
@@ -36,6 +37,7 @@
             <attribute name="states">draft,done</attribute>
         </xpath>
         <xpath expr="//test_states_attrs_with_invisible_existing_and_invisible_single_and">
+            <attribute name="indent_test"/>
             <attribute name="attrs">{'invisible': ['&amp;', ('test8', '=', True)]}</attribute>
             <attribute name="states">draft,done</attribute>
         </xpath>
