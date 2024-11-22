@@ -68,10 +68,11 @@ def stringify_leaf(leaf):
         else:
             operator = 'in'
         switcher = True
-    if right_operand in ('True', 'False', '1', '0') or type(right_operand) in (list, tuple, set, int, float, bool):
-        right_operand = str(right_operand)
-    else:
-        right_operand = "'" + right_operand + "'"
+    if type(right_operand) == str:
+        if re.search('^__field_or_context__\.', right_operand):
+            right_operand = re.sub('^__field_or_context__\.(.*)', '\\1', right_operand)
+        else:
+            right_operand = f"'{right_operand}'"
     if switcher:
         temp_operand = left_operand
         left_operand = right_operand
@@ -113,6 +114,10 @@ def stringify_attr(stack):
 
 def get_new_attrs(attrs):
     new_attrs = {}
+    # Temporarily replace field or context values in leafs by strings prefixed with '__field_or_context__.'
+    # This way the evaluation won't fail on these strings and we can later identify them to convert back to field or context values
+    escaped_operators = ['=', '!=', '>', '>=', '<', '<=', '=\?', '=like', 'like', 'not like', 'ilike', 'not ilike', '=ilike', 'in', 'not in', 'child_of', 'parent_of']
+    attrs = re.sub(f"([\"'](?:{'|'.join(escaped_operators)})[\"']\s*,\s*)([\w\.]+)(\s*[\]\)])", "\\1'__field_or_context__.\\2'\\3", attrs)
     attrs_dict = eval(attrs.strip())
     for attr in NEW_ATTRS:
         if attr in attrs_dict.keys():
