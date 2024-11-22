@@ -5,7 +5,6 @@ from pathlib import Path
 
 xml_4indent_formatter = formatter.XMLFormatter(indent=4)
 NEW_ATTRS = {'required', 'invisible', 'readonly', 'column_invisible'}
-percent_d_regex = re.compile(r"%\('?\"?[\w\.\d_]+'?\"?\)d")
 
 
 def get_files_recursive(path):
@@ -170,12 +169,10 @@ for xml_file in all_xml_files:
             f.close()
             if not 'attrs' in contents and not 'states' in contents:
                 continue
-            counter_for_percent_d_replace = 1
             percent_d_results = {}
-            for percent_d in percent_d_regex.findall(contents):
-                contents = contents.replace(percent_d, "'REPLACEME%s'" % counter_for_percent_d_replace)
-                percent_d_results[counter_for_percent_d_replace] = percent_d
-                counter_for_percent_d_replace += 1
+            for index, percent_d in enumerate(re.findall(r"%\([\w\.]+\)d", contents), 1):
+                contents = contents.replace(percent_d, "'REPLACEME%s'" % index)
+                percent_d_results[index] = percent_d
             soup = bs(contents, 'xml')
             tags_with_attrs = soup.select('[attrs]')
             attribute_tags_name_attrs = soup.select('attribute[name="attrs"]')
