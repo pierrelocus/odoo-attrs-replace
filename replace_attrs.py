@@ -50,11 +50,8 @@ def stringify_leaf(leaf):
 
     # Handle '=?'
     if operator == '=?':
-        if type(right_operand) == str:
-            if re.search('^__field_or_context__\.', right_operand):
-                right_operand = re.sub('^__field_or_context__\.(.*)', '\\1', right_operand)
-            else:
-                right_operand = f"'{right_operand}'"
+        if type(right_operand) is str:
+            right_operand = f"'{right_operand}'"
         return f"({right_operand} in [None, False] or {left_operand} == {right_operand})"
     # Handle '='
     elif operator == '=':
@@ -72,7 +69,7 @@ def stringify_leaf(leaf):
     # Handle 'like' and other operators
     elif 'like' in operator:
         case_insensitive = 'ilike' in operator
-        if type(right_operand) == str and re.search('[_%]', right_operand):
+        if type(right_operand) is str and re.search('[_%]', right_operand):
             # Since wildcards won't work/be recognized after conversion we throw an error so we don't end up with
             # expressions that behave differently from their originals
             raise Exception("Script doesn't support 'like' domains with wildcards")
@@ -84,11 +81,8 @@ def stringify_leaf(leaf):
             else:
                 operator = 'in'
             switcher = True
-    if type(right_operand) == str:
-        if re.search('^__field_or_context__\.', right_operand):
-            right_operand = re.sub('^__field_or_context__\.(.*)', '\\1', right_operand)
-        else:
-            right_operand = f"'{right_operand}'"
+    if type(right_operand) is str:
+        right_operand = f"'{right_operand}'"
     if switcher:
         temp_operand = left_operand
         left_operand = right_operand
@@ -133,14 +127,19 @@ def stringify_attr(stack):
 
 def get_new_attrs(attrs):
     new_attrs = {}
-    # Temporarily replace field or context values in leafs by strings prefixed with '__field_or_context__.'
-    # This way the evaluation won't fail on these strings and we can later identify them to convert back to field or context values
+    # Temporarily replace dynamic variables (field reference, context value, %()d) in leafs by strings prefixed with '__dynamic_variable__.'
+    # This way the evaluation won't fail on these strings and we can later identify them to convert back to  their original values
     escaped_operators = ['=', '!=', '>', '>=', '<', '<=', '=\?', '=like', 'like', 'not like', 'ilike', 'not ilike', '=ilike', 'in', 'not in', 'child_of', 'parent_of']
-    attrs = re.sub(f"([\"'](?:{'|'.join(escaped_operators)})[\"']\s*,\s*)([\w\.]+)(\s*[\]\)])", "\\1'__field_or_context__.\\2'\\3", attrs)
+    attrs = re.sub(f"([\"'](?:{'|'.join(escaped_operators)})[\"']\s*,\s*)([\w\.]+)(?=\s*[\]\)])", r"\1'__dynamic_variable__.\2'", attrs)
+    attrs = re.sub(r"(%\([\w\.]+\)d)", r"'__dynamic_variable__.\1'", attrs)
     attrs_dict = eval(attrs.strip())
     for attr in NEW_ATTRS:
         if attr in attrs_dict.keys():
-            new_attrs[attr] = stringify_attr(attrs_dict[attr])
+            stringified_attr = stringify_attr(attrs_dict[attr])
+            if type(stringified_attr) is str:
+                # Convert dynamic variable strings back to their original form
+                stringified_attr = re.sub(r"'__dynamic_variable__\.([^']+)'", r"\1", stringified_attr)
+            new_attrs[attr] = stringified_attr
     return new_attrs
 
 
@@ -169,10 +168,6 @@ for xml_file in all_xml_files:
             f.close()
             if not 'attrs' in contents and not 'states' in contents:
                 continue
-            percent_d_results = {}
-            for index, percent_d in enumerate(re.findall(r"%\([\w\.]+\)d", contents), 1):
-                contents = contents.replace(percent_d, "'REPLACEME%s'" % index)
-                percent_d_results[index] = percent_d
             soup = bs(contents, 'xml')
             tags_with_attrs = soup.select('[attrs]')
             attribute_tags_name_attrs = soup.select('attribute[name="attrs"]')
@@ -261,8 +256,6 @@ for xml_file in all_xml_files:
                 with open(xml_file, 'wb') as rf:
                     html = soup.prettify(formatter=xml_4indent_formatter)
                     html = prettify_output(html)
-                    for percent_d_result in percent_d_results.keys():
-                        html = html.replace("'REPLACEME%s'" % percent_d_result, percent_d_results[percent_d_result])
                     rf.write(html.encode('utf-8'))
                     ok_files.append(xml_file)
     except Exception as e:
