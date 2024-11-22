@@ -22,6 +22,22 @@
         <xpath expr="//test_states_with_invisible_existing">
             <field states="draft,done" attrs="{'invisible': [('testfield', '=', 'hello world')]}"/>
         </xpath>
+        <!-- field tag with both attrs and states, with attrs having an invisible attribute -->
+        <field name="test" states="draft,done" attrs="{'invisible': True, 'readonly': True}"/>
+        <!-- field tag with both attrs and states, with attrs not having an invisible attribute -->
+        <field name="test" states="draft,done" attrs="{'readonly': True}"/>
+        <!-- field tag with only attrs, with attrs having an invisible attribute -->
+        <field name="test" attrs="{'invisible': True, 'readonly': True}"/>
+        <!-- field tag with only attrs, with attrs not having an invisible attribute -->
+        <field name="test" attrs="{'readonly': True}"/>
+        <!-- field tag with only states -->
+        <field name="test" states="draft,done"/>
+        <!-- non-field tag with both attrs and states -->
+        <group name="test" states="draft,done" attrs="{'invisible': True}"/>
+        <!-- non-field tag with only attrs -->
+        <group name="test" attrs="{'invisible': True}"/>
+        <!-- non-field tag with only states -->
+        <group name="test" states="draft,done"/>
         <xpath expr="//test_states_attrs_with_invisible_existing" position="attributes">
             <attribute name="attrs">{
             'invisible': [
@@ -36,10 +52,37 @@
             }</attribute>
             <attribute name="states">draft,done</attribute>
         </xpath>
-        <xpath expr="//test_states_attrs_with_invisible_existing_and_invisible_single_and">
+        <!-- xpath override of field with both attrs and states -->
+        <xpath expr="//field[@name='test']">
             <attribute name="indent_test"/>
-            <attribute name="attrs">{'invisible': ['&amp;', ('test8', '=', True)]}</attribute>
+            <attribute name="attrs">{'invisible': True}</attribute>
             <attribute name="states">draft,done</attribute>
+        </xpath>
+        <!-- xpath override of field with only attrs -->
+        <xpath expr="//field[@name='test']">
+            <attribute name="indent_test"/>
+            <attribute name="attrs">{'invisible': True}</attribute>
+        </xpath>
+        <!-- xpath override of field with only states -->
+        <xpath expr="//field[@name='test']">
+            <attribute name="indent_test"/>
+            <attribute name="attrs">{'invisible': True}</attribute>
+        </xpath>
+        <!-- xpath override of non-field with both attrs and states -->
+        <xpath expr="//sheet/group[@name='test']">
+            <attribute name="indent_test"/>
+            <attribute name="attrs">{'invisible': True}</attribute>
+            <attribute name="states">draft,done</attribute>
+        </xpath>
+        <!-- xpath override of non-field with only attrs -->
+        <xpath expr="//sheet/group[@name='test']">
+            <attribute name="indent_test"/>
+            <attribute name="attrs">{'invisible': True}</attribute>
+        </xpath>
+        <!-- xpath override of non-field with only states -->
+        <xpath expr="//sheet/group[@name='test']">
+            <attribute name="indent_test"/>
+            <attribute name="attrs">{'invisible': True}</attribute>
         </xpath>
         <field name="test" attrs="{
             'invisible': [
@@ -52,6 +95,7 @@
                 ('test4', 'in', [%(testmodule.test_xml_id)d, %(testmodule.test_xml_id_2)d])
             ]
         }"/>
+        <group name="test" attrs="{'invisible': True}"/>
         <!-- Case given by odoo, single '|' with states - can cause bug while should be accepted -->
         <button name="action_open_action_coupon_program" attrs="{'invisible': ['|', ('allow_modification', '=', False)]}" context="{'enable_add_temporary': 1}" class="btn btn-secondary" string="Actions" type="object" states="draft,sent,sale"/>
     </form>

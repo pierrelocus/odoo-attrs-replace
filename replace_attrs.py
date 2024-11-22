@@ -19,6 +19,7 @@ def normalize_domain(domain):
     """
     Normalize Domain, taken from odoo/osv/expression.py -> just the part so that & operators are added where needed.
     After that, we can use a part of the def parse() from the same file to manage parenthesis for and/or
+
     :rtype: list[str|tuple]
     """
     if len(domain) == 1:
@@ -166,6 +167,7 @@ nok_files = []
 def get_parent_etree_node(root_node, target_node):
     """
     Returns the parent node of a given node, and the index and indentation of the target node in the parent node's direct child nodes list
+
     :param xml.etree.ElementTree.Element root_node:
     :param xml.etree.ElementTree.Element target_node:
     :returns: index, parent_node, indentation
@@ -182,6 +184,53 @@ def get_parent_etree_node(root_node, target_node):
                     indent = parent_elem.text
                 return i, parent_elem, indent
             previous_child = child
+
+
+def get_child_tag_at_index(parent_node, index):
+    """
+    Returns the child node of a node with a given index
+
+    :param xml.etree.ElementTree.Element parent_node:
+    :param int index:
+    :returns: child_node
+    :rtype: xml.etree.ElementTree.Element
+    """
+    for i, child in enumerate(list(parent_node)):
+        if i == index:
+            return child
+
+
+def get_sibling_attribute_tag_of_type(root_node, target_node, attribute_name):
+    """
+    If it exists, returns the attribute tag with the same parent tag for the given name
+
+    :param xml.etree.ElementTree.Element root_node:
+    :param xml.etree.ElementTree.Element target_node:
+    :param str attribute_name:
+    :returns: attribute_tag with name="<attribute_name>"
+    :rtype: xml.etree.ElementTree.Element
+    """
+    _, xpath_node, _ = get_parent_etree_node(root_node, target_node)
+    if node := xpath_node.xpath(f"./attribute[@name='{attribute_name}']"):
+        return node[0]
+
+
+def get_inherited_tag_type(root_node, target_node):
+    """
+    Checks what the type of the tag is that the attribute tag applies to
+
+    :param xml.etree.ElementTree.Element root_node:
+    :param xml.etree.ElementTree.Element target_node:
+    :rtype: str|None
+    """
+    _, parent_tag, _ = get_parent_etree_node(root_node, target_node)
+    if expr := parent_tag.get('expr'):
+        # Checks if the last part of the xpath expression is a tag name and returns it
+        # If not (eg. if the pattern is for example expr="//field[@name='...']/.."), return None
+        if matches := re.findall("^.*/(\w+)[^/]*?$", expr):
+            return matches[0]
+    else:
+        return parent_tag.tag
 
 
 def get_combined_invisible_condition(existing_invisible_condition, states_string):
@@ -238,16 +287,16 @@ for xml_file in all_xml_files:
             nofilesfound = False
             # Management of tags that have attrs=""
             for tag in tags_with_attrs:
-                attrs = tag.attrib.get('attrs')
-                new_attrs = get_new_attrs(attrs)
                 all_attributes = []
                 # TODO: combine existing and new invisible, required, readonly and column_invisible attributes
-                # If both an attrs and one of these attributes are present at the same time, if the attribute is True
-                # then it overrides the domain in the attrs dict. If it is false then the value in the attrs dict has
-                # priority instead
+                #  If both an attrs and one of these attributes are present at the same time, if the attribute is True
+                #  then it overrides the domain in the attrs dict. If it is false then the value in the attrs dict has
+                #  priority instead
                 for attr_name, attr_value in list(tag.attrib.items()):
                     # We have to rebuild the attributes to maintain their order
                     if attr_name == 'attrs':
+                        attrs = tag.get('attrs')
+                        new_attrs = get_new_attrs(attrs)
                         # Insert the new attributes in their original position, in their original order
                         ordered_new_attrs = re.findall(rf"['\"]({'|'.join(NEW_ATTRS)})['\"]\s*:", attrs)
                         for new_attr in ordered_new_attrs:
@@ -257,15 +306,17 @@ for xml_file in all_xml_files:
                 tag.attrib.clear()
                 tag.attrib.update(all_attributes)
 
-            # Management of attributes name="attrs"
+            # Management of <attributes name="attrs">... overrides
             attribute_tags_with_attrs_after = []
             for attribute_tag in attribute_tags_with_attrs:
+                tag_type = get_inherited_tag_type(doc, attribute_tag)
                 tag_index, parent_tag, indent = get_parent_etree_node(doc, attribute_tag)
                 tail = attribute_tag.tail or ''
                 attrs = attribute_tag.text
                 new_attrs = get_new_attrs(attrs)
                 # Insert the new attributes tags in their original position, in their original order in that attrs dict
                 ordered_new_attrs = re.findall(rf"['\"]({'|'.join(NEW_ATTRS)})['\"]\s*:", attrs)
+                invisible_attribute_tag = False
                 for new_attr in ordered_new_attrs:
                     new_tag = etree.Element('attribute', attrib={
                         'name': new_attr
@@ -274,52 +325,154 @@ for xml_file in all_xml_files:
                     # First set the tail so that all following new attribute tags have the same indentation
                     new_tag.tail = indent
                     parent_tag.insert(tag_index, new_tag)
+                    if new_attr == 'invisible':
+                        if not get_sibling_attribute_tag_of_type(doc, new_tag, 'states'):
+                            # Since before Odoo 17 the states and invisible attributes were separate, if a states attribute was
+                            # present in a parent view it would still be combined with the invisible attribute overrides
+                            # in inheriting views. Now that they are combined in 17, if in an inheriting view the invisible
+                            # attribute is overridden but not the states attribute, simply converting the invisible override
+                            # to a separate attribute would actually override any states attributes in parent views as well.
+                            # Since we can't automatically check the inheritance tree to account for this, a TODO is added
+                            todo_tag = etree.Comment(
+                                f"TODO: Result from 'attrs' -> 'invisible' conversion without also overriding 'states' attribute"
+                                f"{indent + (' ' * 5)}Check if this {tag_type + ' ' if tag_type else ''}tag contained a states attribute in any of the parent views, in which case it should be combined into this 'invisible' attribute"
+                                f"{indent + (' ' * 5)}(If any states attributes existed in parent views, they'll also be marked with a TODO)")
+                            todo_tag.tail = indent
+                            parent_tag.insert(tag_index, todo_tag)
+                            attribute_tags_with_attrs_after.append(todo_tag)
+                            tag_index += 1
                     attribute_tags_with_attrs_after.append(new_tag)
                     tag_index += 1
+                if tag_type == 'field':
+                    missing_attrs = [attr for attr in NEW_ATTRS if attr not in ordered_new_attrs]
+                else:
+                    # Only field tags can use readonly, required and column_invisible attributes
+                    missing_attrs = ['invisible'] if 'invisible' not in ordered_new_attrs else []
+                if missing_attrs:
+                    # Before Odoo 17, overriding one attribute (for example 'readonly') in an 'attrs' would mean you had
+                    # to include the other attributes present in the 'attrs'. Any attributes not present in the
+                    # inheriting 'attr' attribute would be considered overridden with an empty value. To ensure the
+                    # conversion keeps this behaviour, and because we can't know which attributes are and aren't present
+                    # in the 'attrs' in the parent views, we have to add all missing attributes as empty tags to be
+                    # safe.
+                    # if attribute_tag_inherits_field(doc, attribute_tag):
+                    if tag_type == 'field':
+                        new_tag = etree.Comment(
+                            f"TODO: Result from converting 'attrs' attribute override without options for {missing_attrs} to separate attributes"
+                            f"{indent + (' ' * 5)}Remove redundant tags below for any of those attributes that are not present in the field tag in any of the parent views"
+                            f"{indent + (' ' * 5)}If someone later adds one of these attributes in the parent views, they would likely be unaware it's still overridden in this view, resulting in unexpected behaviour, which should be avoided")
+                        new_tag.tail = indent
+                        parent_tag.insert(tag_index, new_tag)
+                        attribute_tags_with_attrs_after.append(new_tag)
+                        tag_index += 1
+                    else:
+                        # For non-field tags the 'attrs' attribute normally only contains an 'invisible' option, so
+                        # if there's missing attributes (which would be just the 'invisible' attribute) it means done
+                        # deliberately, so we don't need the TODO
+                        pass
+                    for missing_attr in missing_attrs:
+                        new_tag = etree.Element('attribute', attrib={
+                            'name': missing_attr
+                        })
+                        # First set the tail so that all following new attribute tags have the same indentation
+                        new_tag.tail = indent
+                        parent_tag.insert(tag_index, new_tag)
+                        if missing_attr == 'invisible':
+                            if not get_sibling_attribute_tag_of_type(doc, new_tag, 'states'):
+                                # Since before Odoo 17 the states and invisible attributes were separate, if a states attribute was
+                                # present in an parent view it would still be combined with the invisible attribute overrides
+                                # in inheriting views. Now that they are combined in 17, if in an inheriting view the invisible
+                                # attribute is overridden but not the states attribute, simply converting the invisible override
+                                # to a separate attribute would actually override any states attributes in parent views as well.
+                                # Since we can't automatically check the inheritance tree to account for this, a TODO is added
+                                todo_tag = etree.Comment(
+                                    f"TODO: Result from 'attrs' -> 'invisible' conversion without also overriding 'states' attribute"
+                                    f"{indent + (' ' * 5)}Check if this {tag_type + ' ' if tag_type else ''}tag contained a states attribute in any of the parent views, that should be combined into this 'invisible' attribute"
+                                    f"{indent + (' ' * 5)}(If any states attributes existed in parent views, they'll also be marked with a TODO)")
+                                todo_tag.tail = indent
+                                parent_tag.insert(tag_index, todo_tag)
+                                attribute_tags_with_attrs_after.append(todo_tag)
+                                tag_index += 1
+                        attribute_tags_with_attrs_after.append(new_tag)
+                        tag_index += 1
                 # Then set the tail of the last added tag so that the following tags maintain their original indentation
                 new_tag.tail = tail
                 parent_tag.remove(attribute_tag)
 
             # Management of tags that have states=""
             for state_tag in tags_with_states:
-                base_invisible = ''
+                states_attribute = state_tag.get('states', '')
                 invisible_attribute = state_tag.get('invisible', '')
-                new_invisible_attr = get_combined_invisible_condition(invisible_attribute,
-                                                                      state_tag.attrib.get('states', ''))
+                # Since before Odoo 17 the states and invisible attributes were separate, if an invisible attribute
+                # was overridden/added in inheriting views it would still be combined with the states attribute
+                # from parent views. Now that they are combined in 17, if in an inheriting view the invisible
+                # attribute was overridden/added but not the states attribute, the states condition would have to
+                # be added in as well. Since we can't automatically check the inheritance tree to account for this
+                # automatically, a TODO is added
+                tag_index, parent_tag, indent = get_parent_etree_node(doc, state_tag)
+                if invisible_attribute:
+                    conversion_action_string = f"Result from merging \"states='{states_attribute}'\" attribute with an 'invisible' attribute"
+                else:
+                    conversion_action_string = f"Result from converting \"states='{states_attribute}'\" attribute into an 'invisible' attribute"
+                todo_tag = etree.Comment(
+                    f"TODO: {conversion_action_string}"
+                    f"{indent + (' ' * 5)}Manually combine states condition into any 'invisible' overrides in inheriting views as well")
+                todo_tag.tail = indent
+                parent_tag.insert(tag_index, todo_tag)
+
+                new_invisible_attribute = get_combined_invisible_condition(invisible_attribute, states_attribute)
                 all_attributes = []
                 for attr_name, attr_value in list(state_tag.attrib.items()):
                     # We have to rebuild the attributes to maintain their order
                     if attr_name == 'invisible' or (attr_name == 'states' and not invisible_attribute):
                         # Update invisible attribute if it exists, else replace the states attribute
-                        all_attributes.append(('invisible', new_invisible_attr))
+                        all_attributes.append(('invisible', new_invisible_attribute))
                     elif attr_name != 'states':
                         # Don't keep the states attribute
                         all_attributes.append((attr_name, attr_value))
                 state_tag.attrib.clear()
                 state_tag.attrib.update(all_attributes)
 
-            # Management of attributes name="states"
+            # Management of <attribute name="states">... overrides
             attribute_tags_with_states_after = []
             for attribute_tag_states in attribute_tags_with_states:
+                tag_type = get_inherited_tag_type(doc, attribute_tag_states)
                 tag_index, parent_tag, indent = get_parent_etree_node(doc, attribute_tag_states)
                 tail = attribute_tag_states.tail
-                if invisible_tags := parent_tag.xpath("./attribute[@name='invisible']"):
-                    attribute_tag_invisible = invisible_tags[0]
+                attribute_tag_invisible = get_sibling_attribute_tag_of_type(doc, attribute_tag_states, 'invisible')
+                if attribute_tag_invisible:
+                    # If the states tag is merged into an invisible tag, the tail of the previous tag
+                    # has to be updated, since otherwise the tag after the states tag will get indented the
+                    # same as the states tag
                     if tag_index > 0:
-                        invisible_tag_index, invisible_parent_tag, invisible_indent = get_parent_etree_node(doc, attribute_tag_invisible)
-                        if invisible_tag_index == tag_index - 1:
-                            # If the attrs and invisible tags directly follow each other the tail of the invisible tag
-                            # has to be updated, since otherwise the element after the states tag will get indented the
-                            # same as the states tag
-                            attribute_tag_invisible.tail = attribute_tag_states.tail
+                        # Not necessary if states tag has index 1 since this guarantees at least the invisible tag
+                        # with the same indentation follows
+                        previous_tag = get_child_tag_at_index(parent_tag, tag_index - 1)
+                        previous_tag.tail = attribute_tag_states.tail
                 else:
+                    # Since before Odoo 17 the states and invisible attributes were separate, if an invisible attribute
+                    # was present in an parent view it would still be combined with the states attribute overrides
+                    # in inheriting views. Now that they are combined in 17, if in an inheriting view the states
+                    # attribute is overridden but not the invisible attribute, simply converting the states override
+                    # to an invisible attribute would actually override any invisible attributes in parent views as well.
+                    # Since we can't automatically check the inheritance tree to account for this, a TODO is added
+                    todo_tag = etree.Comment(
+                        f"TODO: Result from \"states='{states_attribute}'\" -> 'invisible' conversion without also overriding 'attrs' attribute"
+                        f"{indent + (' ' * 5)}Check if this {tag_type + ' ' if tag_type else ''}tag contains an invisible attribute in any of the parent views, in which case it should be combined into this new 'invisible' attribute"
+                        f"{indent + (' ' * 5)}(Only applies to invisible attributes in the parent views that were not originally states attributes. Those from converted states attributes will be marked with a TODO)")
+                    todo_tag.tail = indent
+                    parent_tag.insert(tag_index, todo_tag)
+                    attribute_tags_with_states_after.append(todo_tag)
+                    tag_index += 1
                     # If no invisible attribute tag exists, add it in place of the original states attribute tag
                     attribute_tag_invisible = etree.Element('attribute', attrib={'name': 'invisible'})
                     attribute_tag_invisible.tail = tail
                     parent_tag.insert(tag_index, attribute_tag_invisible)
-                parent_tag.remove(attribute_tag_states)
+
+                # TODO: account for attributes without value
                 invisible_condition = get_combined_invisible_condition(attribute_tag_invisible.text,
                                                                        attribute_tag_states.text)
+                parent_tag.remove(attribute_tag_states)
                 attribute_tag_invisible.text = invisible_condition
                 attribute_tags_with_states_after.append(attribute_tag_invisible)
 
@@ -340,6 +493,7 @@ for xml_file in all_xml_files:
                     ok_files.append(xml_file)
     except Exception as e:
         nok_files.append((xml_file, e))
+        raise e
 
 
 print('\n################################################')
