@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 from lxml import etree
 
-NEW_ATTRS = {'required', 'invisible', 'readonly', 'column_invisible'}
+NEW_ATTRS = ['invisible', 'required', 'readonly', 'column_invisible']
 
 
 def get_files_recursive(path):
@@ -148,10 +148,14 @@ def get_new_attrs(attrs):
     attrs = re.sub(f"([\"'](?:{'|'.join(escaped_operators)})[\"']\s*,\s*)([\w\.]+)(?=\s*[\]\)])", r"\1'__dynamic_variable__.\2'", attrs)
     attrs = re.sub(r"(%\([\w\.]+\)d)", r"'__dynamic_variable__.\1'", attrs)
     attrs = attrs.strip()
-    if re.search("^{.*}$", attrs):
+    if re.search("^{.*}$", attrs, re.DOTALL):
         # attrs can be an empty value, in which case the eval() would fail, so only eval attrs representing dictionaries
         attrs_dict = eval(attrs.strip())
         for attr, attr_value in attrs_dict.items():
+            if attr not in NEW_ATTRS:
+                # We don't know what to do with attributes not in NEW_ATTR, so the user will have to process those
+                # manually when checking the differences post-conversion
+                continue
             stringified_attr = stringify_attr(attr_value)
             if type(stringified_attr) is str:
                 # Convert dynamic variable strings back to their original form
@@ -296,16 +300,31 @@ for xml_file in all_xml_files:
                 #  If both an attrs and one of these attributes are present at the same time, if the attribute is True
                 #  then it overrides the domain in the attrs dict. If it is false then the value in the attrs dict has
                 #  priority instead
+                attrs = tag.get('attrs', '')
+                new_attrs = get_new_attrs(attrs)
+                # Insert the new attributes in their original position, in their original order in that attrs dict
                 for attr_name, attr_value in list(tag.attrib.items()):
                     # We have to rebuild the attributes to maintain their order
                     if attr_name == 'attrs':
-                        attrs = tag.get('attrs', '')
-                        new_attrs = get_new_attrs(attrs)
                         # Insert the new attributes in their original position, in their original order
-                        ordered_new_attrs = re.findall(rf"['\"]({'|'.join(NEW_ATTRS)})['\"]\s*:", attrs)
-                        for new_attr in ordered_new_attrs:
-                            all_attributes.append((new_attr, new_attrs.get(new_attr)))
-                    else:
+                        for new_attr, new_attr_value in new_attrs.items():
+                            if new_attr in tag.attrib:
+                                # Combine attribute if present as a separate attribute as well as in the 'attrs' dict
+                                # This is the same behaviour that Odoo 16- uses in this situation
+                                # Since we can't know what the reason for the double attribute definition is we
+                                # combine both values regardless, even if the old value is simply 'True' or '1', so
+                                # the condition in the attrs dict is not lost
+                                old_attr_value = tag.attrib.get(new_attr)
+                                if old_attr_value in [True, 1, 'True', '1']:
+                                    new_attr_value = f"True or ({new_attr_value})"
+                                elif old_attr_value in [False,  0, 'False', '0']:
+                                    new_attr_value = f"False or ({new_attr_value})"
+                                else:
+                                    new_attr_value = f"({old_attr_value}) or ({new_attr_value})"
+                            all_attributes.append((new_attr, new_attr_value))
+                    elif attr_name not in new_attrs:
+                        # Add all other attributes in their same position. We skip the attributes also present in the
+                        # 'attrs' dict since they will have been merged into those 'attrs' attributes
                         all_attributes.append((attr_name, attr_value))
                 tag.attrib.clear()
                 tag.attrib.update(all_attributes)
@@ -318,14 +337,27 @@ for xml_file in all_xml_files:
                 tail = attribute_tag.tail or ''
                 attrs = attribute_tag.text or ''
                 new_attrs = get_new_attrs(attrs)
+                attribute_tags_to_remove = []
                 # Insert the new attributes tags in their original position, in their original order in that attrs dict
-                ordered_new_attrs = re.findall(rf"['\"]({'|'.join(NEW_ATTRS)})['\"]\s*:", attrs)
-                invisible_attribute_tag = False
-                for new_attr in ordered_new_attrs:
+                for new_attr, new_attr_value in new_attrs.items():
+                    if separate_attr_tag := get_sibling_attribute_tag_of_type(doc, attribute_tag, new_attr):
+                        attribute_tags_to_remove.append(separate_attr_tag)
+                        # Combine attribute if present as a separate attribute as well as in the 'attrs' dict
+                        # This is the same behaviour that Odoo 16- uses in this situation
+                        # Since we can't know what the reason for the double attribute definition is we
+                        # combine both values regardless, even if the old value is simply 'True' or '1', so
+                        # the condition in the attrs dict is not lost
+                        old_attr_value = separate_attr_tag.text
+                        if old_attr_value in [True, 1, 'True', '1']:
+                            new_attr_value = f"True or ({new_attr_value})"
+                        elif old_attr_value in [False,  0, 'False', '0']:
+                            new_attr_value = f"False or ({new_attr_value})"
+                        else:
+                            new_attr_value = f"({old_attr_value}) or ({new_attr_value})"
                     new_tag = etree.Element('attribute', attrib={
                         'name': new_attr
                     })
-                    new_tag.text = str(new_attrs.get(new_attr))
+                    new_tag.text = str(new_attr_value)
                     # First set the tail so that all following new attribute tags have the same indentation
                     new_tag.tail = indent
                     parent_tag.insert(tag_index, new_tag)
@@ -347,11 +379,16 @@ for xml_file in all_xml_files:
                             tag_index += 1
                     attribute_tags_with_attrs_after.append(new_tag)
                     tag_index += 1
+                missing_attrs = []
                 if tag_type == 'field':
-                    missing_attrs = [attr for attr in NEW_ATTRS if attr not in ordered_new_attrs]
+                    potentially_missing_attrs = NEW_ATTRS
                 else:
                     # Only field tags can use readonly, required and column_invisible attributes
-                    missing_attrs = ['invisible'] if 'invisible' not in ordered_new_attrs else []
+                    potentially_missing_attrs = ['invisible']
+                for missing_attr in potentially_missing_attrs:
+                    if missing_attr not in new_attrs and not get_sibling_attribute_tag_of_type(doc, attribute_tag, missing_attr):
+                        # Only consider attribute missing if it's not in the 'attrs' dict and also not in a separate attribute tag
+                        missing_attrs.append(missing_attr)
                 if missing_attrs:
                     # Before Odoo 17, overriding one attribute (for example 'readonly') in an 'attrs' would mean you had
                     # to include the other attributes present in the 'attrs'. Any attributes not present in the
@@ -371,8 +408,8 @@ for xml_file in all_xml_files:
                         tag_index += 1
                     else:
                         # For non-field tags the 'attrs' attribute normally only contains an 'invisible' option, so
-                        # if there's missing attributes (which would be just the 'invisible' attribute) it means done
-                        # deliberately, so we don't need the TODO
+                        # if there's missing attributes (which would be just the 'invisible' attribute) it means it was
+                        # done deliberately, so we don't need the TODO
                         pass
                     for missing_attr in missing_attrs:
                         new_tag = etree.Element('attribute', attrib={
@@ -402,6 +439,16 @@ for xml_file in all_xml_files:
                 # Then set the tail of the last added tag so that the following tags maintain their original indentation
                 new_tag.tail = tail
                 parent_tag.remove(attribute_tag)
+                # For attributes that have been combined, the original separate attribute tag has to be removed
+                # We do so while maintaining the correct indentation
+                for attribute_tag_to_remove in attribute_tags_to_remove:
+                    tag_index, parent_tag, indent = get_parent_etree_node(doc, attribute_tag_to_remove)
+                    if tag_index > 0:
+                        # Not necessary if tag has index 0 since this guarantees at least 1 tag with the same
+                        # indentation follows
+                        previous_tag = get_child_tag_at_index(parent_tag, tag_index - 1)
+                        previous_tag.tail = attribute_tag_to_remove.tail
+                        parent_tag.remove(attribute_tag_to_remove)
 
             # Management of tags that have states=""
             for state_tag in tags_with_states:
@@ -450,7 +497,7 @@ for xml_file in all_xml_files:
                     # has to be updated, since otherwise the tag after the states tag will get indented the
                     # same as the states tag
                     if tag_index > 0:
-                        # Not necessary if states tag has index 1 since this guarantees at least the invisible tag
+                        # Not necessary if states tag has index 0 since this guarantees at least the invisible tag
                         # with the same indentation follows
                         previous_tag = get_child_tag_at_index(parent_tag, tag_index - 1)
                         previous_tag.tail = attribute_tag_states.tail

@@ -1,44 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <form>
-        <xpath expr="//">
-            <!-- readonly should give: -->
-            <!-- (field1 == 'yes' and field2 != parent.some_field) or (field3 == uid or 'some-string'.lower() in field4.lower()) or 'yes' not in field5 and field6 == 'yes' -->
-            <field string="foo" attrs="{'invisible': True, 'readonly': ['|', '|', '&amp;', ('field1', '=', 'yes'), ('field2', '!=', parent.some_field), '|', ('field3', '=', uid), ('field4', '=ilike', 'some-string'), ('field5', 'not like', 'yes'), ('field6', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c']), ('otherfield', '=?', some_field)], 'column_invisible': 0}" name="name"/>
-        </xpath>
+        <!-- readonly should give: -->
+        <!-- (field1 == 'yes' and field2 != parent.some_field) or (field3 == uid or 'some-string'.lower() in field4.lower()) or 'yes' not in field5 and field6 == 'yes' -->
+        <field string="foo" attrs="{'invisible': True, 'readonly': ['|', '|', '&amp;', ('field1', '=', 'yes'), ('field2', '!=', parent.some_field), '|', ('field3', '=', uid), ('field4', '=ilike', 'some-string'), ('field5', 'not like', 'yes'), ('field6', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c']), ('otherfield', '=?', some_field)], 'column_invisible': 0}" name="name"/>
         <xpath expr="//." position="attributes">
             <attribute name="attrs">{'invisible': True, 'readonly': [('otherfield', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c'])], 'column_invisible': 0}</attribute>
         </xpath>
-        <xpath expr="//field" position="attributes">
+        <xpath expr="//field[@name='test1']" position="attributes">
             <attribute name="attrs">{'invisible': [('some', '=', False), ('other', '!=', False)], 'readonly': [('some', '=', True), ('other', '!=', True)], 'required': [('some', '=', []), ('other', '!=', [])], 'column_invisible': [('some', '=', 'str'), ('other', '!=', 'str')]}</attribute>
             <attribute name="indent_test"/>
         </xpath>
-        <xpath expr="//test_states_simple_case">
-            <field states="draft,done"/>
-        </xpath>
-        <xpath expr="//test_states_attrs_simple_case">
-            <attribute name="states">draft,done</attribute>
-        </xpath>
-        <xpath expr="//test_states_with_invisible_existing">
-            <field states="draft,done" attrs="{'invisible': [('testfield', '=', 'hello world')]}"/>
-        </xpath>
-        <!-- field tag with both attrs and states, with attrs having an invisible attribute -->
-        <field name="test" states="draft,done" attrs="{'invisible': True, 'readonly': True}"/>
-        <!-- field tag with both attrs and states, with attrs not having an invisible attribute -->
-        <field name="test" states="draft,done" attrs="{'readonly': True}"/>
-        <!-- field tag with only attrs, with attrs having an invisible attribute -->
-        <field name="test" attrs="{'invisible': True, 'readonly': True}"/>
-        <!-- field tag with only attrs, with attrs not having an invisible attribute -->
-        <field name="test" attrs="{'readonly': True}"/>
+        <!-- field tag with both attrs (invisible, readonly) and states -->
+        <field name="test1" states="draft,done" attrs="{'invisible': True, 'readonly': True}"/>
+        <!-- field tag with both attrs (readonly, required) and states, with a double required attribute -->
+        <field required="1" name="test2" states="draft,done" attrs="{'readonly': True, 'required': [('otherfield', '=', 'yes')]}"/>
+        <!-- field tag with only attrs (invisible, readonly)-->
+        <field name="test3" attrs="{'invisible': True, 'readonly': True}"/>
+        <!-- field tag with only attrs (readonly) -->
+        <field name="test4" attrs="{'readonly': True}"/>
         <!-- field tag with only states -->
-        <field name="test" states="draft,done"/>
-        <!-- non-field tag with both attrs and states -->
-        <group name="test" states="draft,done" attrs="{'invisible': True}"/>
+        <field name="test5" states="draft,done"/>
+        <!-- non-field tag with both attrs (invisible) and states -->
+        <group name="test6" states="draft,done" attrs="{'invisible': True}"/>
         <!-- non-field tag with only attrs -->
-        <group name="test" attrs="{'invisible': True}"/>
+        <group name="test7" attrs="{'invisible': True}"/>
         <!-- non-field tag with only states -->
-        <group name="test" states="draft,done"/>
-        <xpath expr="//test_states_attrs_with_invisible_existing" position="attributes">
+        <group name="test8" states="draft,done"/>
+        <!-- xpath override of field with both attrs (invisible) and states -->
+        <xpath expr="//field[@name='test5']" position="attributes">
             <attribute name="attrs">{
             'invisible': [
                 '|',
@@ -52,57 +42,51 @@
             }</attribute>
             <attribute name="states">draft,done</attribute>
         </xpath>
-        <!-- xpath override of field with both attrs and states -->
-        <xpath expr="//field[@name='test']">
-            <attribute name="indent_test"/>
-            <attribute name="attrs">{'invisible': True}</attribute>
+        <!-- xpath override of field with both attrs (required, invisible) and states and double required attribute -->
+        <xpath expr="//field[@name='test6']">
+            <attribute name="attrs">{'required': True, 'invisible': [('testfield', '=', 'hello world')]}</attribute>
             <attribute name="states">draft,done</attribute>
+            <attribute name="required">1</attribute>
         </xpath>
-        <!-- xpath override of field with only attrs -->
-        <xpath expr="//field[@name='test']">
-            <attribute name="indent_test"/>
+        <!-- xpath override of field with only attrs (invisible) -->
+        <xpath expr="//field[@name='test7']">
             <attribute name="attrs">{'invisible': True}</attribute>
         </xpath>
         <!-- xpath override of field with only states -->
-        <xpath expr="//field[@name='test']">
-            <attribute name="indent_test"/>
-            <attribute name="attrs">{'invisible': True}</attribute>
+        <xpath expr="//field[@name='test8']">
+            <attribute name="states">draft,done</attribute>
         </xpath>
-        <!-- xpath override of field with empty attrs, and states -->
-        <xpath expr="//field[@name='test']">
-            <attribute name="indent_test"/>
+        <!-- xpath override of field with empty attrs and non-empty states -->
+        <xpath expr="//field[@name='test9']">
             <attribute name="attrs"></attribute>
             <attribute name="states">draft,done</attribute>
         </xpath>
-        <!-- xpath override of field with attrs and empty states -->
-        <xpath expr="//field[@name='test']">
+        <!-- xpath override of field with non-empty attrs (required, invisible) and empty states -->
+        <xpath expr="//field[@name='test10']">
             <attribute name="indent_test"/>
             <attribute name="attrs">{'required': True, 'invisible': True}</attribute>
             <attribute name="states"></attribute>
         </xpath>
-        <!-- xpath override of field with empty attrs and states -->
-        <xpath expr="//field[@name='test']">
-            <attribute name="indent_test"/>
+        <!-- xpath override of field with empty attrs and empty states -->
+        <xpath expr="//field[@name='test11']">
             <attribute name="attrs"></attribute>
             <attribute name="states"></attribute>
         </xpath>
-        <!-- xpath override of non-field with both attrs and states -->
-        <xpath expr="//sheet/group[@name='test']">
-            <attribute name="indent_test"/>
+        <!-- xpath override of non-field with both attrs (invisible) and states -->
+        <xpath expr="//sheet/group[@name='test12']">
             <attribute name="attrs">{'invisible': True}</attribute>
             <attribute name="states">draft,done</attribute>
         </xpath>
-        <!-- xpath override of non-field with only attrs -->
-        <xpath expr="//sheet/group[@name='test']">
-            <attribute name="indent_test"/>
+        <!-- xpath override of non-field with only attrs (invisible) -->
+        <xpath expr="//sheet/group[@name='test13']">
             <attribute name="attrs">{'invisible': True}</attribute>
         </xpath>
         <!-- xpath override of non-field with only states -->
-        <xpath expr="//sheet/group[@name='test']">
-            <attribute name="indent_test"/>
-            <attribute name="attrs">{'invisible': True}</attribute>
+        <xpath expr="//sheet/group[@name='test14']">
+            <attribute name="states">draft,done</attribute>
         </xpath>
-        <field name="test" attrs="{
+        <!-- field tag with only attrs (invisible) -->
+        <field name="test9" attrs="{
             'invisible': [
                 '|',
                 '|',
@@ -113,7 +97,8 @@
                 ('test4', 'in', [%(testmodule.test_xml_id)d, %(testmodule.test_xml_id_2)d])
             ]
         }"/>
-        <group name="test" attrs="{'invisible': True}"/>
+        <!-- non-field tag with only attrs (invisible) -->
+        <group name="test10" attrs="{'invisible': True}"/>
         <!-- Case given by odoo, single '|' with states - can cause bug while should be accepted -->
         <button name="action_open_action_coupon_program" attrs="{'invisible': ['|', ('allow_modification', '=', False)]}" context="{'enable_add_temporary': 1}" class="btn btn-secondary" string="Actions" type="object" states="draft,sent,sale"/>
     </form>
