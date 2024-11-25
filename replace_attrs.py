@@ -400,7 +400,7 @@ for xml_file in all_xml_files:
                     if tag_type == 'field':
                         new_tag = etree.Comment(
                             f"TODO: Result from converting 'attrs' attribute override without options for {missing_attrs} to separate attributes"
-                            f"{indent + (' ' * 5)}Remove redundant tags below for any of those attributes that are not present in the field tag in any of the parent views"
+                            f"{indent + (' ' * 5)}Remove redundant empty tags below for any of those attributes that are not present in the field tag in any of the parent views"
                             f"{indent + (' ' * 5)}If someone later adds one of these attributes in the parent views, they would likely be unaware it's still overridden in this view, resulting in unexpected behaviour, which should be avoided")
                         new_tag.tail = indent
                         parent_tag.insert(tag_index, new_tag)
