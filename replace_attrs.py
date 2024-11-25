@@ -147,10 +147,12 @@ def get_new_attrs(attrs):
     escaped_operators = ['=', '!=', '>', '>=', '<', '<=', '=\?', '=like', 'like', 'not like', 'ilike', 'not ilike', '=ilike', 'in', 'not in', 'child_of', 'parent_of']
     attrs = re.sub(f"([\"'](?:{'|'.join(escaped_operators)})[\"']\s*,\s*)([\w\.]+)(?=\s*[\]\)])", r"\1'__dynamic_variable__.\2'", attrs)
     attrs = re.sub(r"(%\([\w\.]+\)d)", r"'__dynamic_variable__.\1'", attrs)
-    attrs_dict = eval(attrs.strip())
-    for attr in NEW_ATTRS:
-        if attr in attrs_dict.keys():
-            stringified_attr = stringify_attr(attrs_dict[attr])
+    attrs = attrs.strip()
+    if re.search("^{.*}$", attrs):
+        # attrs can be an empty value, in which case the eval() would fail, so only eval attrs representing dictionaries
+        attrs_dict = eval(attrs.strip())
+        for attr, attr_value in attrs_dict.items():
+            stringified_attr = stringify_attr(attr_value)
             if type(stringified_attr) is str:
                 # Convert dynamic variable strings back to their original form
                 stringified_attr = re.sub(r"'__dynamic_variable__\.([^']+)'", r"\1", stringified_attr)
@@ -233,20 +235,22 @@ def get_inherited_tag_type(root_node, target_node):
         return parent_tag.tag
 
 
-def get_combined_invisible_condition(existing_invisible_condition, states_string):
+def get_combined_invisible_condition(invisible_attribute, states_attribute):
     """
-    :param str existing_invisible_condition: invisible attribute condition already present on the same tag as the states
-    :param str states_string: string of the form 'state1,state2,...'
+    :param str invisible_attribute: invisible attribute condition already present on the same tag as the states
+    :param str states_attribute: string of the form 'state1,state2,...'
     """
-    states_list = re.split(r"\s*,\s*", states_string.strip())
+    invisible_attribute = invisible_attribute.strip()
+    states_attribute = states_attribute.strip()
+    if not states_attribute:
+        return invisible_attribute
+    states_list = re.split(r"\s*,\s*", states_attribute.strip())
     states_to_add = f"state not in {states_list}"
-    if not states_string:
-        return existing_invisible_condition
-    if existing_invisible_condition:
-        if existing_invisible_condition.endswith('or') or existing_invisible_condition.endswith('and'):
-            combined_invisible_condition = f"{existing_invisible_condition} {states_to_add}"
+    if invisible_attribute:
+        if invisible_attribute.endswith('or') or invisible_attribute.endswith('and'):
+            combined_invisible_condition = f"{invisible_attribute} {states_to_add}"
         else:
-            combined_invisible_condition = f"{existing_invisible_condition} or {states_to_add}"
+            combined_invisible_condition = f"{invisible_attribute} or {states_to_add}"
     else:
         combined_invisible_condition = states_to_add
     return combined_invisible_condition
@@ -295,7 +299,7 @@ for xml_file in all_xml_files:
                 for attr_name, attr_value in list(tag.attrib.items()):
                     # We have to rebuild the attributes to maintain their order
                     if attr_name == 'attrs':
-                        attrs = tag.get('attrs')
+                        attrs = tag.get('attrs', '')
                         new_attrs = get_new_attrs(attrs)
                         # Insert the new attributes in their original position, in their original order
                         ordered_new_attrs = re.findall(rf"['\"]({'|'.join(NEW_ATTRS)})['\"]\s*:", attrs)
@@ -312,7 +316,7 @@ for xml_file in all_xml_files:
                 tag_type = get_inherited_tag_type(doc, attribute_tag)
                 tag_index, parent_tag, indent = get_parent_etree_node(doc, attribute_tag)
                 tail = attribute_tag.tail or ''
-                attrs = attribute_tag.text
+                attrs = attribute_tag.text or ''
                 new_attrs = get_new_attrs(attrs)
                 # Insert the new attributes tags in their original position, in their original order in that attrs dict
                 ordered_new_attrs = re.findall(rf"['\"]({'|'.join(NEW_ATTRS)})['\"]\s*:", attrs)
@@ -426,7 +430,8 @@ for xml_file in all_xml_files:
                     # We have to rebuild the attributes to maintain their order
                     if attr_name == 'invisible' or (attr_name == 'states' and not invisible_attribute):
                         # Update invisible attribute if it exists, else replace the states attribute
-                        all_attributes.append(('invisible', new_invisible_attribute))
+                        if new_invisible_attribute:
+                            all_attributes.append(('invisible', new_invisible_attribute))
                     elif attr_name != 'states':
                         # Don't keep the states attribute
                         all_attributes.append((attr_name, attr_value))
@@ -469,9 +474,9 @@ for xml_file in all_xml_files:
                     attribute_tag_invisible.tail = tail
                     parent_tag.insert(tag_index, attribute_tag_invisible)
 
-                # TODO: account for attributes without value
-                invisible_condition = get_combined_invisible_condition(attribute_tag_invisible.text,
-                                                                       attribute_tag_states.text)
+                invisible_attribute = attribute_tag_invisible.text or ''
+                states_attribute = attribute_tag_states.text or ''
+                invisible_condition = get_combined_invisible_condition(invisible_attribute, states_attribute)
                 parent_tag.remove(attribute_tag_states)
                 attribute_tag_invisible.text = invisible_condition
                 attribute_tags_with_states_after.append(attribute_tag_invisible)

@@ -68,6 +68,24 @@
             <attribute name="indent_test"/>
             <attribute name="attrs">{'invisible': True}</attribute>
         </xpath>
+        <!-- xpath override of field with empty attrs, and states -->
+        <xpath expr="//field[@name='test']">
+            <attribute name="indent_test"/>
+            <attribute name="attrs"></attribute>
+            <attribute name="states">draft,done</attribute>
+        </xpath>
+        <!-- xpath override of field with attrs and empty states -->
+        <xpath expr="//field[@name='test']">
+            <attribute name="indent_test"/>
+            <attribute name="attrs">{'required': True, 'invisible': True}</attribute>
+            <attribute name="states"></attribute>
+        </xpath>
+        <!-- xpath override of field with empty attrs and states -->
+        <xpath expr="//field[@name='test']">
+            <attribute name="indent_test"/>
+            <attribute name="attrs"></attribute>
+            <attribute name="states"></attribute>
+        </xpath>
         <!-- xpath override of non-field with both attrs and states -->
         <xpath expr="//sheet/group[@name='test']">
             <attribute name="indent_test"/>
