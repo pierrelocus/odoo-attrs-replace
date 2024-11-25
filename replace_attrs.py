@@ -145,6 +145,8 @@ def get_new_attrs(attrs):
     # Temporarily replace dynamic variables (field reference, context value, %()d) in leafs by strings prefixed with '__dynamic_variable__.'
     # This way the evaluation won't fail on these strings and we can later identify them to convert back to  their original values
     escaped_operators = ['=', '!=', '>', '>=', '<', '<=', '=\?', '=like', 'like', 'not like', 'ilike', 'not ilike', '=ilike', 'in', 'not in', 'child_of', 'parent_of']
+    attrs = re.sub("&lt;", "<", attrs)
+    attrs = re.sub("&gt;", ">", attrs)
     attrs = re.sub(f"([\"'](?:{'|'.join(escaped_operators)})[\"']\s*,\s*)(?!False|True)([\w\.]+)(?=\s*[\]\)])", r"\1'__dynamic_variable__.\2'", attrs)
     attrs = re.sub(r"(%\([\w\.]+\)d)", r"'__dynamic_variable__.\1'", attrs)
     attrs = attrs.strip()

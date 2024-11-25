@@ -28,6 +28,8 @@
         <group name="test7" attrs="{'invisible': True}"/>
         <!-- non-field tag with only states -->
         <group name="test8" states="draft,done"/>
+        <!-- test conversion of special characters-->
+        <field name="test9" attrs="{'readonly': [('a', '>', 0), ('b', '&lt;', 0), ('c', '&gt;', 0)]}"/>
         <!-- xpath override of field with both attrs (invisible) and states -->
         <xpath expr="//field[@name='test5']" position="attributes">
             <attribute name="attrs">{
