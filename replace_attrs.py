@@ -340,7 +340,7 @@ for xml_file in all_xml_files:
                 attribute_tags_to_remove = []
                 # Insert the new attributes tags in their original position, in their original order in that attrs dict
                 for new_attr, new_attr_value in new_attrs.items():
-                    if separate_attr_tag := get_sibling_attribute_tag_of_type(doc, attribute_tag, new_attr):
+                    if (separate_attr_tag := get_sibling_attribute_tag_of_type(doc, attribute_tag, new_attr)) is not None:
                         attribute_tags_to_remove.append(separate_attr_tag)
                         # Combine attribute if present as a separate attribute as well as in the 'attrs' dict
                         # This is the same behaviour that Odoo 16- uses in this situation
@@ -362,7 +362,7 @@ for xml_file in all_xml_files:
                     new_tag.tail = indent
                     parent_tag.insert(tag_index, new_tag)
                     if new_attr == 'invisible':
-                        if not get_sibling_attribute_tag_of_type(doc, new_tag, 'states'):
+                        if get_sibling_attribute_tag_of_type(doc, new_tag, 'states') is None:
                             # Since before Odoo 17 the states and invisible attributes were separate, if a states attribute was
                             # present in a parent view it would still be combined with the invisible attribute overrides
                             # in inheriting views. Now that they are combined in 17, if in an inheriting view the invisible
@@ -386,7 +386,7 @@ for xml_file in all_xml_files:
                     # Only field tags can use readonly, required and column_invisible attributes
                     potentially_missing_attrs = ['invisible']
                 for missing_attr in potentially_missing_attrs:
-                    if missing_attr not in new_attrs and not get_sibling_attribute_tag_of_type(doc, attribute_tag, missing_attr):
+                    if missing_attr not in new_attrs and get_sibling_attribute_tag_of_type(doc, attribute_tag, missing_attr) is None:
                         # Only consider attribute missing if it's not in the 'attrs' dict and also not in a separate attribute tag
                         missing_attrs.append(missing_attr)
                 if missing_attrs:
@@ -419,7 +419,7 @@ for xml_file in all_xml_files:
                         new_tag.tail = indent
                         parent_tag.insert(tag_index, new_tag)
                         if missing_attr == 'invisible':
-                            if not get_sibling_attribute_tag_of_type(doc, new_tag, 'states'):
+                            if get_sibling_attribute_tag_of_type(doc, new_tag, 'states') is None:
                                 # Since before Odoo 17 the states and invisible attributes were separate, if a states attribute was
                                 # present in an parent view it would still be combined with the invisible attribute overrides
                                 # in inheriting views. Now that they are combined in 17, if in an inheriting view the invisible
@@ -492,7 +492,7 @@ for xml_file in all_xml_files:
                 tag_index, parent_tag, indent = get_parent_etree_node(doc, attribute_tag_states)
                 tail = attribute_tag_states.tail
                 attribute_tag_invisible = get_sibling_attribute_tag_of_type(doc, attribute_tag_states, 'invisible')
-                if attribute_tag_invisible:
+                if attribute_tag_invisible is not None:
                     # If the states tag is merged into an invisible tag, the tail of the previous tag
                     # has to be updated, since otherwise the tag after the states tag will get indented the
                     # same as the states tag
