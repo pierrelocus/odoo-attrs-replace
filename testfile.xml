@@ -7,6 +7,7 @@
         <xpath expr="//." position="attributes">
             <attribute name="attrs">{'invisible': True, 'readonly': [('otherfield', '=', 'yes')], 'required': [('field', 'in', ['a', 'b', 'c'])], 'column_invisible': 0}</attribute>
         </xpath>
+        <!-- all leafs should evaluate to '[not] <some|other>' -->
         <xpath expr="//field[@name='test1']" position="attributes">
             <attribute name="attrs">{'invisible': [('some', '=', False), ('other', '!=', False)], 'readonly': [('some', '=', True), ('other', '!=', True)], 'required': [('some', '=', []), ('other', '!=', [])], 'column_invisible': [('some', '=', 'str'), ('other', '!=', 'str')]}</attribute>
             <attribute name="indent_test"/>
