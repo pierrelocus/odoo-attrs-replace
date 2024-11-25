@@ -43,3 +43,6 @@ Thank you for your contributions:
 
   -  @lorenuars19 for the better README
   -  @artygo8 for the faster and cleaner get_files_recursive function
+  -  @elhamdaoui because details are important
+  -  @ThomasDePontieuSomko clear MVP in this repo, many thanks for all the enhancements and refactors
+
