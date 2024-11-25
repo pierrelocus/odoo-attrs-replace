@@ -1,5 +1,5 @@
 # Odoo Attrs replacer
-As Odoo changed the attrs to (no more attrs) in v17, I created this little script to help you replace all attrs in your XML files with corresponding attributes in the XML directly.
+As Odoo changed the attrs to (no more attrs) in v17, as well as combining states into invisible attributes, I created this little script to help you replace all attrs and states in your XML files with corresponding attributes in the XML directly.
 
 ## Dependencies
 
@@ -26,6 +26,11 @@ The script will ask you, for each file, if you want to replace all `attrs=` and 
 
 Unless you chose in the beginning 'y' for auto-replace (don't ask for each file)
 
+## Important before running the script
+
+In Odoo 17 the invisible attributes on fields in tree views will no longer hide the whole column, only the cell. Hiding the whole column is now done with the column_invisible attribute instead.
+Before running this script, the user should first convert all those invisible attributes on tree fields to column_invisible instead. If this is not done first, those attributes will be combined with the invisible attributes in the attrs dict instead, and thus lost (though it will just be every cell in the column that will be made invisible instead of the column itself, so in essence the values will still be made invisible using the same old conditions).
+
 ## Found a flaw ?
 
 Please open an Issue or make a PR or contact me on LinkedIn (Pierre Locus)
@@ -35,7 +40,7 @@ Please include a **[Minimal Reproducible Example](https://en.wikipedia.org/wiki/
 Thanks in advance!
 
 ## TODO:
-  - [ ] Support missing operators "=?", "child_of", "parent_of" (less used than the others already supported)
+  - [ ] Support missing operators "child_of", "parent_of" (less used than the others already supported)
 
 ## Contributors
 
